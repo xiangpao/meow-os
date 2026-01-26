@@ -1,0 +1,7 @@
+streamlit
+google-generativeai
+librosa
+numpy
+scipy
+Pillow
+matplotlib
