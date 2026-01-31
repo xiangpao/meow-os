@@ -3,7 +3,6 @@ import google.generativeai as genai
 import os
 import time
 import tempfile
-import base64  # <--- 新增：用于处理动图编码
 from PIL import Image
 from utils import analyze_audio_advanced, extract_audio_from_video
 
@@ -32,7 +31,7 @@ st.markdown("""
         color: #4E342E;
     }
     
-    /* 标题样式 */
+    /* 标题样式：圆润、深咖啡色 */
     h1 { 
         color: #5D4037 !important; 
         font-family: 'Comic Sans MS', 'ZKKuaiLe', '幼圆', sans-serif !important;
@@ -40,15 +39,13 @@ st.markdown("""
         text-shadow: 2px 2px 0px #FFF;
     }
     
-    /* 顶部图片居中 */
-    .stImage, .css-1v0mbdj {
-        display: flex;
-        justify_content: center;
-        align-items: center;
-        margin-bottom: -10px;
+    /* 顶部动图容器居中 */
+    .stImage {
+        text-align: center;
+        margin-bottom: -20px;
     }
     
-    /* 卡片/折叠面板 */
+    /* 卡片/折叠面板：像一块白色的方糖，圆角 */
     .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"] {
         background-color: #FFFFFF !important;
         border-radius: 20px !important;
@@ -56,7 +53,7 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(93, 64, 55, 0.1) !important;
     }
     
-    /* 按钮：焦糖色 */
+    /* 按钮：焦糖色果冻质感 */
     .stButton>button {
         width: 100%;
         background: linear-gradient(45deg, #D2691E, #8B4513);
@@ -75,7 +72,7 @@ st.markdown("""
         background: linear-gradient(45deg, #E67E22, #A0522D);
     }
     
-    /* Tab 样式 */
+    /* Tab 标签页：未选中是浅咖，选中是深咖 */
     .stTabs [data-baseweb="tab"] {
         background-color: #F5E6D3;
         border-radius: 15px 15px 0 0;
@@ -88,47 +85,27 @@ st.markdown("""
         color: #D2691E;
     }
     
-    /* 字体优化 */
+    /* 字体颜色优化 */
     p, label, .stMarkdown {
         color: #4E342E !important;
         font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
     }
     
-    /* 隐藏边框 */
+    /* 隐藏上传组件自带的丑边框 */
     [data-testid="stFileUploadDropzone"] {
         border: 2px dashed #D7CCC8 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 顶部看板 (修复动图不动的问题) ---
-# 定义一个函数：把图片转换成 HTML 代码，强制浏览器播放
-def render_gif(gif_path, width=200):
-    try:
-        # 尝试读取本地文件
-        with open(gif_path, "rb") as f:
-            data = f.read()
-        # 转换成 base64 编码
-        b64 = base64.b64encode(data).decode()
-        # 注入 HTML
-        st.markdown(
-            f'<div style="text-align: center;"><img src="data:image/gif;base64,{b64}" width="{width}"></div>', 
-            unsafe_allow_html=True
-        )
-    except:
-        # 如果本地没有文件，或者读取失败，使用网络备用图
-        st.markdown(
-            f'<div style="text-align: center;"><img src="https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif" width="{width}"></div>', 
-            unsafe_allow_html=True
-        )
-
-# 调用函数显示 logo.gif
-render_gif("logo.gif")
+# --- 2. 顶部看板 (萌化升级) ---
+# 换成了 Bongo Cat 打碟/敲键盘的图，绝对是猫，且符合“电波台”设定
+st.image("https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDN6eHd4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/Lq0h93752f6J9tijvr/giphy.gif", width=180)
 
 st.title("☕ 喵星电波台")
-st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; margin-top: -10px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
 
-# 设置区
+# 设置区 (像菜单一样折叠)
 with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
     context = st.selectbox(
         "📍 信号发射源 (当前场景)",
@@ -181,6 +158,7 @@ with tab1:
     audio_file = st.file_uploader("支持 wav/mp3/m4a/aac", type=["wav", "mp3", "m4a", "aac"], key="audio_up", label_visibility="collapsed")
     
     st.markdown("##### 2. (可选) 增加视觉数据")
+    # 修复了文案，明确功能
     with st.expander("📷 开启相机抓拍", expanded=False):
         img_cam = st.camera_input("拍摄猫咪表情")
     img_up = st.file_uploader("或从相册上传图片", type=["jpg", "png"], key="img_up", label_visibility="collapsed")
@@ -229,6 +207,7 @@ with tab1:
 
                     st.success("✅ 解码成功")
                     
+                    # 萌化数据卡片
                     c1, c2, c3 = st.columns(3)
                     c1.metric("情绪", data['pitch_trend'].split()[0])
                     c2.metric("时长", f"{data['duration']}s")
