@@ -9,12 +9,12 @@ from utils import analyze_audio_advanced, extract_audio_from_video
 # --- 0. 系统配置 ---
 st.set_page_config(
     page_title="🐱 喵星电波台", 
-    page_icon="📡", 
+    page_icon="☕", 
     layout="centered", 
     initial_sidebar_state="collapsed"
 )
 
-# 清除可能导致报错的代理环境变量
+# 清除代理
 if "HTTP_PROXY" in os.environ: del os.environ["HTTP_PROXY"]
 if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 
@@ -22,95 +22,118 @@ if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 if 'baseline_pitch' not in st.session_state:
     st.session_state['baseline_pitch'] = None
 
-# --- 1. CSS 深度汉化与美化 ---
+# --- 1. CSS 拿铁风深度定制 ---
 st.markdown("""
 <style>
-    /* 全局背景：奶茶色渐变 */
+    /* 全局背景：热牛奶白 -> 浅拿铁渐变 */
     .stApp {
-        background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+        background: linear-gradient(180deg, #FFFDF7 0%, #F5E6D3 100%);
+        color: #4E342E;
     }
     
-    /* 标题样式 */
+    /* 标题样式：圆润、深咖啡色 */
     h1 { 
-        color: #FF8C00; 
-        font-family: 'Comic Sans MS', '幼圆', sans-serif !important;
+        color: #5D4037 !important; 
+        font-family: 'Comic Sans MS', 'ZKKuaiLe', '幼圆', sans-serif !important;
+        font-weight: 800;
         text-shadow: 2px 2px 0px #FFF;
     }
     
-    /* 隐藏 Streamlit 默认的英文提示，用 CSS 伪装成中文 (黑科技) */
-    /* 注意：Browse files 这种按钮内部文字很难改，取决于用户浏览器语言 */
-    /* 但我们可以把上面的 Label 做得非常醒目 */
-    
-    .stFileUploader label {
-        font-size: 1.2rem !important;
-        color: #FF6347 !important;
-        font-weight: bold !important;
+    /* 顶部动图容器居中 */
+    .stImage {
+        text-align: center;
+        margin-bottom: -20px;
     }
     
-    /* 按钮美化：果冻质感 */
+    /* 卡片/折叠面板：像一块白色的方糖，圆角 */
+    .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"] {
+        background-color: #FFFFFF !important;
+        border-radius: 20px !important;
+        border: 2px solid #EFEBE9 !important;
+        box-shadow: 0 4px 12px rgba(93, 64, 55, 0.1) !important;
+    }
+    
+    /* 按钮：焦糖色果冻质感 */
     .stButton>button {
-        background: linear-gradient(45deg, #FF7F50, #FF4500);
+        width: 100%;
+        background: linear-gradient(45deg, #D2691E, #8B4513);
         color: white;
         border-radius: 25px;
         height: 55px;
         font-size: 18px;
         font-weight: bold;
         border: none;
-        box-shadow: 0 4px 10px rgba(255, 69, 0, 0.3);
+        box-shadow: 0 4px 10px rgba(139, 69, 19, 0.3);
         transition: all 0.3s;
     }
     .stButton>button:hover {
         transform: scale(1.02);
-        box-shadow: 0 6px 15px rgba(255, 69, 0, 0.5);
+        box-shadow: 0 6px 15px rgba(139, 69, 19, 0.5);
+        background: linear-gradient(45deg, #E67E22, #A0522D);
+    }
+    
+    /* Tab 标签页：未选中是浅咖，选中是深咖 */
+    .stTabs [data-baseweb="tab"] {
+        background-color: #F5E6D3;
+        border-radius: 15px 15px 0 0;
+        color: #5D4037;
+        font-weight: bold;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #FFFFFF;
+        border-top: 3px solid #D2691E;
+        color: #D2691E;
+    }
+    
+    /* 字体颜色优化 */
+    p, label, .stMarkdown {
+        color: #4E342E !important;
+        font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+    
+    /* 隐藏上传组件自带的丑边框 */
+    [data-testid="stFileUploadDropzone"] {
+        border: 2px dashed #D7CCC8 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 顶部看板 ---
-# 换了一个更稳定的动图源
-st.image("https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif", use_column_width=True)
-st.title("🐱 喵星电波台")
-st.caption("—— 接收主子来自 50Hz 频段的加密通话")
+# --- 2. 顶部看板 (萌化升级) ---
+# 换成了 Bongo Cat 打碟/敲键盘的图，绝对是猫，且符合“电波台”设定
+st.image("https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDN6eHd4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/Lq0h93752f6J9tijvr/giphy.gif", width=180)
 
-# 科学原理 (折叠)
-with st.expander("📡 信号解码原理 (基于 Susanne Schötz 研究)", expanded=False):
-    st.markdown("""
-    * **F0 基频 (Pitch)**: 升调 (↗) 通常代表请求/疑问；降调 (↘) 代表拒绝/陈述。
-    * **时长 (Duration)**: 短音通常是打招呼；长音 (>1s) 代表强烈需求或抱怨。
-    * **多模态**: 结合动作 (如尾巴竖直 vs 炸毛) 可大幅提高准确率。
-    """)
+st.title("☕ 喵星电波台")
+st.markdown("<p style='text-align: center; margin-top: -10px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
 
-# 设置区
-with st.expander("⚙️ 信号校准 (Settings)", expanded=True):
-    # 基于科学研究扩展的场景列表
+# 设置区 (像菜单一样折叠)
+with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
     context = st.selectbox(
-        "📍 发射源位置 (当前场景)",
+        "📍 信号发射源 (当前场景)",
         [
-            "🍽️ 干饭时刻 (Food Soliciting) - 最常见", 
-            "🚪 门窗/受阻 (Barrier Frustration)", 
-            "🛋️ 贴贴/求摸 (Affection/Brushing)", 
-            "🏥 害怕/应激 (Isolation/Vet)", 
-            "🦋 猎杀时刻 (Prey/Hunting)",
-            "😡 别挨老子 (Agonistic/Warning)",
-            "🌙 深夜跑酷 (Night Activity)"
+            "🍽️ 干饭时刻 (Food)", 
+            "🚪 门窗/受阻 (Barrier)", 
+            "🛋️ 贴贴/求摸 (Affection)", 
+            "🏥 害怕/应激 (Stress)", 
+            "🦋 猎杀时刻 (Hunting)",
+            "😡 别挨老子 (Warning)",
+            "🌙 深夜跑酷 (Night)"
         ]
     )
     
     c1, c2 = st.columns([2, 1])
     with c1:
         if st.session_state['baseline_pitch']: 
-            st.success(f"✅ 已锁定基准频率: {st.session_state['baseline_pitch']}Hz")
+            st.success(f"✅ 已锁定基准: {st.session_state['baseline_pitch']}Hz")
         else: 
-            st.info("💡 建议录入一声「平时最放松的叫声」作为基准。")
+            st.info("💡 建议录入一声「平时最放松的叫声」")
     with c2:
         if st.button("清除缓存"):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
-# --- 3. 连接云端大脑 ---
+# --- 3. 连接云端 ---
 ai_status_msg = ""
 ai_ready = False
-
 try:
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
@@ -118,26 +141,25 @@ try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         ai_ready = True
     else:
-        ai_status_msg = "密钥未配置 (Secrets Empty)"
+        ai_status_msg = "密钥缺失"
 except Exception as e:
     ai_status_msg = str(e)
 
 if not ai_ready:
-    st.warning(f"⚠️ 只有本地算法在工作 (AI 离线)")
-    st.caption(f"原因: {ai_status_msg}。请去 Manage App -> Settings -> Secrets 填入 GOOGLE_API_KEY。")
+    st.warning(f"⚠️ 仅本地模式 (AI 离线)")
+    st.caption(f"原因: {ai_status_msg}。请去 Secrets 填入 GOOGLE_API_KEY。")
 
-# --- 4. 核心功能区 (Tab) ---
+# --- 4. 核心功能 (Tab) ---
 tab1, tab2 = st.tabs(["🎙️ 语音接收", "📹 视频同传"])
 
 # === Tab 1: 语音 ===
 with tab1:
     st.markdown("##### 1. 采集声波 (录音/上传)")
-    # 这里的 label 会显示为中文，但下方按钮语言取决于浏览器
-    audio_file = st.file_uploader("支持 wav/mp3/m4a/aac", type=["wav", "mp3", "m4a", "aac"], key="audio_up")
+    audio_file = st.file_uploader("支持 wav/mp3/m4a/aac", type=["wav", "mp3", "m4a", "aac"], key="audio_up", label_visibility="collapsed")
     
-    st.markdown("##### 2. (可选) 拍张照/录像提高准确度")
-    # Camera Input 只能拍照，文案修改以符合实际功能
-    with st.expander("📸 开启相机抓拍", expanded=False):
+    st.markdown("##### 2. (可选) 增加视觉数据")
+    # 修复了文案，明确功能
+    with st.expander("📷 开启相机抓拍", expanded=False):
         img_cam = st.camera_input("拍摄猫咪表情")
     img_up = st.file_uploader("或从相册上传图片", type=["jpg", "png"], key="img_up", label_visibility="collapsed")
     img_final = img_cam if img_cam else img_up
@@ -146,7 +168,7 @@ with tab1:
         if not audio_file:
             st.error("请先上传一段喵叫声！")
         else:
-            with st.spinner("正在分析 50Hz 生物电波..."):
+            with st.spinner("☕ 正在冲泡数据..."):
                 data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
                 
                 if data['status'] == 'error':
@@ -176,7 +198,7 @@ with tab1:
                             要求：
                             - 语气：傲娇、可爱或急切。
                             - 不要说“这只猫”，直接说“本喵”或“我”。
-                            - 简短有力，像发微信一样。
+                            - 简短有力，像发朋友圈一样。
                             """
                             inputs = [prompt]
                             if img_final: inputs.append(Image.open(img_final))
@@ -189,7 +211,7 @@ with tab1:
                     c1, c2, c3 = st.columns(3)
                     c1.metric("情绪", data['pitch_trend'].split()[0])
                     c2.metric("时长", f"{data['duration']}s")
-                    c3.metric("哈气值", "高!!" if data['is_rough'] else "低")
+                    c3.metric("音高", f"{data['mean_pitch']}Hz")
 
                     st.markdown("### 🐱 主子说：")
                     if ai_result:
@@ -205,13 +227,13 @@ with tab1:
 # === Tab 2: 视频 ===
 with tab2:
     st.info("💡 提示：点击下方按钮 -> 选择 **“录像”** 或 **“从图库选择”**。")
-    video_file = st.file_uploader("📹 上传视频文件", type=["mp4", "mov", "avi", "m4v"], key="video_up")
+    video_file = st.file_uploader("📹 上传视频文件", type=["mp4", "mov", "avi", "m4v"], key="video_up", label_visibility="collapsed")
 
     if st.button("🎬 分析视频信号", key="btn_video"):
         if not video_file:
             st.warning("请先上传视频喵！")
         else:
-            with st.spinner("正在分离音轨并分析肢体语言..."):
+            with st.spinner("⏳ 正在分析肢体语言..."):
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 tfile.write(video_file.read())
                 video_path = tfile.name
@@ -226,7 +248,7 @@ with tab2:
                     
                     if data['status'] == 'error':
                         st.warning("⚠️ 未检测到猫叫声，将仅分析动作。")
-                        data = {"pitch_trend": "未知", "duration": 0} # 兜底
+                        data = {"pitch_trend": "未知", "duration": 0} 
                     
                     ai_msg = ""
                     if ai_ready:
