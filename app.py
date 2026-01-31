@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 清除代理
+# 清除可能存在的代理设置 (防止云端报错)
 if "HTTP_PROXY" in os.environ: del os.environ["HTTP_PROXY"]
 if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 
@@ -23,6 +23,7 @@ if 'baseline_pitch' not in st.session_state:
     st.session_state['baseline_pitch'] = None
 
 # --- 1. CSS 拿铁风深度定制 ---
+# ⚠️ 注意：下面这段代码必须以 """ 开头，以 """ 结尾，千万不要漏掉！
 st.markdown("""
 <style>
     /* 全局背景：热牛奶白 -> 浅拿铁渐变 */
@@ -31,7 +32,7 @@ st.markdown("""
         color: #4E342E;
     }
     
-    /* 标题样式：圆润、深咖啡色 */
+    /* 标题样式 */
     h1 { 
         color: #5D4037 !important; 
         font-family: 'Comic Sans MS', 'ZKKuaiLe', '幼圆', sans-serif !important;
@@ -39,13 +40,13 @@ st.markdown("""
         text-shadow: 2px 2px 0px #FFF;
     }
     
-    /* 顶部动图容器居中 */
+    /* 顶部图片居中 */
     .stImage {
         text-align: center;
-        margin-bottom: -20px;
+        margin-bottom: -10px;
     }
     
-    /* 卡片/折叠面板：像一块白色的方糖，圆角 */
+    /* 卡片/折叠面板：像一块白色的方糖 */
     .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"] {
         background-color: #FFFFFF !important;
         border-radius: 20px !important;
@@ -72,7 +73,7 @@ st.markdown("""
         background: linear-gradient(45deg, #E67E22, #A0522D);
     }
     
-    /* Tab 标签页：未选中是浅咖，选中是深咖 */
+    /* Tab 标签页美化 */
     .stTabs [data-baseweb="tab"] {
         background-color: #F5E6D3;
         border-radius: 15px 15px 0 0;
@@ -91,21 +92,21 @@ st.markdown("""
         font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
     }
     
-    /* 隐藏上传组件自带的丑边框 */
+    /* 隐藏上传组件自带的边框 */
     [data-testid="stFileUploadDropzone"] {
         border: 2px dashed #D7CCC8 !important;
     }
 </style>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True) 
+# ^^^ 上面这一行非常重要，一定不能漏掉！ ^^^
 
-# --- 2. 顶部看板 (萌化升级) ---
-# 换成了 Bongo Cat 打碟/敲键盘的图，绝对是猫，且符合“电波台”设定
-st.image("https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDN6eHd4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/Lq0h93752f6J9tijvr/giphy.gif", width=180)
+# --- 2. 顶部看板 (Bongo Cat) ---
+st.image("https://media.giphy.com/media/u1SH63nB18TSk/giphy.gif", width=200)
 
 st.title("☕ 喵星电波台")
-st.markdown("<p style='text-align: center; margin-top: -10px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
 
-# 设置区 (像菜单一样折叠)
+# 设置区
 with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
     context = st.selectbox(
         "📍 信号发射源 (当前场景)",
@@ -158,7 +159,6 @@ with tab1:
     audio_file = st.file_uploader("支持 wav/mp3/m4a/aac", type=["wav", "mp3", "m4a", "aac"], key="audio_up", label_visibility="collapsed")
     
     st.markdown("##### 2. (可选) 增加视觉数据")
-    # 修复了文案，明确功能
     with st.expander("📷 开启相机抓拍", expanded=False):
         img_cam = st.camera_input("拍摄猫咪表情")
     img_up = st.file_uploader("或从相册上传图片", type=["jpg", "png"], key="img_up", label_visibility="collapsed")
@@ -207,7 +207,6 @@ with tab1:
 
                     st.success("✅ 解码成功")
                     
-                    # 萌化数据卡片
                     c1, c2, c3 = st.columns(3)
                     c1.metric("情绪", data['pitch_trend'].split()[0])
                     c2.metric("时长", f"{data['duration']}s")
