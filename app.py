@@ -67,7 +67,6 @@ st.markdown("""
         box-shadow: 0 6px 15px rgba(139, 69, 19, 0.5);
         background: linear-gradient(45deg, #E67E22, #A0522D);
     }
-    /* Tab 样式 */
     .stTabs [data-baseweb="tab"] {
         background-color: #F5E6D3;
         border-radius: 15px 15px 0 0;
@@ -89,18 +88,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 顶部看板 ---
-def render_gif_html(gif_path, width=200):
-    """生成 GIF 的 HTML 代码，不直接显示，返回字符串"""
-    try:
-        with open(gif_path, "rb") as f:
-            data = f.read()
-        b64 = base64.b64encode(data).decode()
-        return f'<div style="text-align: center;"><img src="data:image/gif;base64,{b64}" width="{width}"></div>'
-    except:
-        return f'<div style="text-align: center;"><img src="https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif" width="{width}"></div>'
+# --- 3. 顶部看板 (保持 Bongo Cat) ---
+def render_gif_html(gif_source, width=200):
+    """灵活渲染 GIF，支持本地路径或网络链接"""
+    if os.path.exists(gif_source):
+        try:
+            with open(gif_source, "rb") as f:
+                data = f.read()
+            b64 = base64.b64encode(data).decode()
+            return f'<div style="text-align: center;"><img src="data:image/gif;base64,{b64}" width="{width}"></div>'
+        except:
+            pass
+    # 如果不是本地文件，或者读取失败，当作网络链接处理
+    return f'<div style="text-align: center;"><img src="{gif_source}" width="{width}"></div>'
 
-# 初始显示静态 Logo
+# 顶部 Logo 依旧使用本地的 logo.gif (如果没有则显示网络图)
 st.markdown(render_gif_html("logo.gif"), unsafe_allow_html=True)
 
 st.title("🐱 喵星电波台")
@@ -135,7 +137,6 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
     
     if calib_file:
         if st.button("⚡ 立即分析并设为基准", key="btn_cal_direct"):
-            # 这里的 Spinner 也可以保留，因为很快
             with st.spinner("正在提取声纹特征..."):
                 cal_data = analyze_audio_advanced(calib_file, baseline_pitch=None)
                 if cal_data['status'] == 'error':
@@ -160,10 +161,11 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
-# --- 连接云端 ---
+# --- 连接云端 (增强兼容性) ---
 ai_ready = False
-# 配置 System Instruction (系统指令)，强制锁定角色
-# 注意：这需要 google-generativeai >= 0.7.2
+# [新增] 算数猫 GIF 链接，用于等待动画
+loading_gif_url = "https://media.giphy.com/media/3o7bu3XilJ5BOiSGic/giphy.gif" 
+
 try:
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
@@ -177,8 +179,10 @@ try:
         语气要生动、二次元，根据数据判断是傲娇、慵懒、还是急切。
         """
         
+        # [修改点] 尝试使用 gemini-1.5-flash
+        # 如果还是不行，代码下面有 Debug 逻辑
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash', # 坚守 1.5 Flash 稳健版
+            model_name='gemini-1.5-flash', 
             system_instruction=system_instruction
         )
         ai_ready = True
@@ -205,12 +209,12 @@ with tab1:
         if not audio_file:
             st.error("请先上传一段喵叫声！")
         else:
-            # === 核心修改：C+D 混合等待特效 ===
-            loading_placeholder = st.empty() # 创建占位容器
+            # === C+D 混合等待特效 ===
+            loading_placeholder = st.empty() 
             
-            # 第一阶段：显示 GIF 和初始进度
+            # 第一阶段：显示 [算数猫] 和初始进度
             with loading_placeholder.container():
-                st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                st.markdown(render_gif_html(loading_gif_url, width=200), unsafe_allow_html=True) # 使用新图
                 st.info("🎧 正在捕获声波特征...")
                 st.progress(10)
             
@@ -219,12 +223,12 @@ with tab1:
             
             # 第二阶段：更新进度
             with loading_placeholder.container():
-                st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                st.markdown(render_gif_html(loading_gif_url, width=200), unsafe_allow_html=True)
                 st.info("📡 正在连接喵星基站 (50Hz)...")
                 st.progress(50)
 
             if data['status'] == 'error':
-                loading_placeholder.empty() # 清除等待动图
+                loading_placeholder.empty()
                 st.error(f"❌ 信号干扰: {data['msg']}")
             else:
                 # 准备逻辑字符串
@@ -240,7 +244,7 @@ with tab1:
                 if ai_ready:
                     # 第三阶段：AI 思考中
                     with loading_placeholder.container():
-                        st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                        st.markdown(render_gif_html(loading_gif_url, width=200), unsafe_allow_html=True)
                         st.info("🐈 正在破译加密电波...")
                         st.progress(80)
                     
@@ -255,8 +259,16 @@ with tab1:
                         ai_result = model.generate_content(inputs).text
                     except Exception as e: 
                         st.error(f"云端连接中断: {e}")
-                        if "404" in str(e):
-                            st.caption("请尝试在 Streamlit 后台 Reboot 或 Delete App 重建。")
+                        # [诊断信息] 帮助我们确认账号支持哪些模型
+                        with st.expander("🛠️ 工程师诊断日志 (Debug Log)"):
+                            st.write(f"当前报错: {e}")
+                            try:
+                                st.write("当前 API Key 可用的模型列表:")
+                                for m in genai.list_models():
+                                    st.write(f"- {m.name}")
+                            except Exception as list_e:
+                                st.write(f"无法列出模型: {list_e}")
+
                 
                 # 任务完成，清除占位符
                 loading_placeholder.empty()
@@ -302,7 +314,7 @@ with tab2:
             loading_placeholder = st.empty()
             
             with loading_placeholder.container():
-                st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                st.markdown(render_gif_html(loading_gif_url, width=200), unsafe_allow_html=True)
                 st.info("🎞️ 正在分离音轨 & 逐帧解析...")
                 st.progress(30)
 
@@ -326,7 +338,7 @@ with tab2:
                 ai_msg = ""
                 if ai_ready:
                     with loading_placeholder.container():
-                        st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                        st.markdown(render_gif_html(loading_gif_url, width=200), unsafe_allow_html=True)
                         st.info("🐈 AI 大脑正在疯狂运转...")
                         st.progress(70)
 
