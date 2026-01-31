@@ -6,15 +6,15 @@ import tempfile
 from PIL import Image
 from utils import analyze_audio_advanced, extract_audio_from_video
 
-# --- 0. 系统配置 (萌化版) ---
+# --- 0. 系统配置 ---
 st.set_page_config(
-    page_title="喵语翻译官 🐾", 
-    page_icon="🐱", 
+    page_title="🐱 喵星电波台", 
+    page_icon="📡", 
     layout="centered", 
     initial_sidebar_state="collapsed"
 )
 
-# 清除代理防止报错
+# 清除可能导致报错的代理环境变量
 if "HTTP_PROXY" in os.environ: del os.environ["HTTP_PROXY"]
 if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 
@@ -22,192 +22,196 @@ if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 if 'baseline_pitch' not in st.session_state:
     st.session_state['baseline_pitch'] = None
 
-# --- 1. CSS 深度美化 (二次元风格) ---
+# --- 1. CSS 深度汉化与美化 ---
 st.markdown("""
 <style>
-    /* 全局背景：暖暖的猫爪白 */
+    /* 全局背景：奶茶色渐变 */
     .stApp {
-        background-color: #FFF5EE; 
-        background-image: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%);
+        background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
     }
     
-    /* 标题字体：可爱圆体 */
+    /* 标题样式 */
     h1 { 
-        color: #FF7F50; 
+        color: #FF8C00; 
         font-family: 'Comic Sans MS', '幼圆', sans-serif !important;
         text-shadow: 2px 2px 0px #FFF;
     }
     
-    /* 卡片容器：圆角+阴影 */
-    .css-1r6slb0, .stExpander {
-        background-color: rgba(255, 255, 255, 0.8);
-        border-radius: 20px;
-        border: 2px solid #FFDAB9;
-        box-shadow: 0 4px 15px rgba(255, 182, 193, 0.3);
+    /* 隐藏 Streamlit 默认的英文提示，用 CSS 伪装成中文 (黑科技) */
+    /* 注意：Browse files 这种按钮内部文字很难改，取决于用户浏览器语言 */
+    /* 但我们可以把上面的 Label 做得非常醒目 */
+    
+    .stFileUploader label {
+        font-size: 1.2rem !important;
+        color: #FF6347 !important;
+        font-weight: bold !important;
     }
     
-    /* 按钮：果冻质感 */
+    /* 按钮美化：果冻质感 */
     .stButton>button {
-        background: linear-gradient(45deg, #FF7F50, #FF6347);
+        background: linear-gradient(45deg, #FF7F50, #FF4500);
         color: white;
-        border-radius: 30px;
+        border-radius: 25px;
         height: 55px;
         font-size: 18px;
         font-weight: bold;
         border: none;
-        box-shadow: 0 5px 15px rgba(255, 99, 71, 0.4);
-        transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(255, 69, 0, 0.3);
+        transition: all 0.3s;
     }
     .stButton>button:hover {
         transform: scale(1.02);
-        box-shadow: 0 8px 20px rgba(255, 99, 71, 0.6);
-    }
-
-    /* 字体优化 */
-    p, label {
-        color: #5D4037;
-        font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        box-shadow: 0 6px 15px rgba(255, 69, 0, 0.5);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 顶部看板与设置 ---
-st.image("https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDN6eHd4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aHlodXZ4aSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/Lq0h93752f6J9tijvr/giphy.gif", width=100)
-st.title("🐾 喵语翻译官")
-st.caption("—— 听懂主子每一句“喵”背后的心机")
+# --- 2. 顶部看板 ---
+# 换了一个更稳定的动图源
+st.image("https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif", use_column_width=True)
+st.title("🐱 喵星电波台")
+st.caption("—— 接收主子来自 50Hz 频段的加密通话")
 
-# 科学原理折叠区
-with st.expander("🔬 这不是玩具！点击查看科学原理", expanded=False):
+# 科学原理 (折叠)
+with st.expander("📡 信号解码原理 (基于 Susanne Schötz 研究)", expanded=False):
     st.markdown("""
-    **本应用基于生物声学 (Bio-acoustics) 与 多模态 AI 构建：**
-    1.  **F0 基频分析**：通过 `Librosa` 提取猫叫声的旋律（升调通常代表请求，降调代表抗拒）。
-    2.  **时长维度**：短促音 (<0.5s) 多为社交确认，长音 (>1.5s) 多为强烈需求。
-    3.  **多模态融合**：结合 `Gemini Vision` 识别耳/尾体态，修正翻译准确率。
+    * **F0 基频 (Pitch)**: 升调 (↗) 通常代表请求/疑问；降调 (↘) 代表拒绝/陈述。
+    * **时长 (Duration)**: 短音通常是打招呼；长音 (>1s) 代表强烈需求或抱怨。
+    * **多模态**: 结合动作 (如尾巴竖直 vs 炸毛) 可大幅提高准确率。
     """)
 
 # 设置区
-with st.expander("⚙️ 场景校准 (必选)", expanded=True):
+with st.expander("⚙️ 信号校准 (Settings)", expanded=True):
+    # 基于科学研究扩展的场景列表
     context = st.selectbox(
-        "📍 刚才发生在哪？",
-        ["🍽️ 饭点/厨房 (最常见)", "🚪 被关门外/窗边", "🛋️ 撸猫/沙发上", "🌙 深夜跑酷", "🏥 宠物医院/外出", "🦋 窗外有猎物"]
+        "📍 发射源位置 (当前场景)",
+        [
+            "🍽️ 干饭时刻 (Food Soliciting) - 最常见", 
+            "🚪 门窗/受阻 (Barrier Frustration)", 
+            "🛋️ 贴贴/求摸 (Affection/Brushing)", 
+            "🏥 害怕/应激 (Isolation/Vet)", 
+            "🦋 猎杀时刻 (Prey/Hunting)",
+            "😡 别挨老子 (Agonistic/Warning)",
+            "🌙 深夜跑酷 (Night Activity)"
+        ]
     )
     
     c1, c2 = st.columns([2, 1])
     with c1:
         if st.session_state['baseline_pitch']: 
-            st.success(f"✅ 已记录主子标准音高: {st.session_state['baseline_pitch']}Hz")
+            st.success(f"✅ 已锁定基准频率: {st.session_state['baseline_pitch']}Hz")
         else: 
-            st.info("💡 尚未记录标准音。建议录入一声平时最放松的叫声作为基准。")
+            st.info("💡 建议录入一声「平时最放松的叫声」作为基准。")
     with c2:
-        if st.button("清除记忆"):
+        if st.button("清除缓存"):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
 # --- 3. 连接云端大脑 ---
-ai_error_msg = ""
+ai_status_msg = ""
+ai_ready = False
+
 try:
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    ai_ready = True
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        ai_ready = True
+    else:
+        ai_status_msg = "密钥未配置 (Secrets Empty)"
 except Exception as e:
-    ai_ready = False
-    ai_error_msg = str(e)
+    ai_status_msg = str(e)
 
 if not ai_ready:
-    st.error(f"⚠️ 云端大脑离线 (仅本地模式)")
-    if "did not find a label" in str(ai_error_msg):
-        st.caption("🔴 原因：未在 Streamlit 后台配置 API Key。请去 Manage App -> Settings -> Secrets 填入密钥。")
-    else:
-        st.caption(f"🔴 原因：{ai_error_msg}")
+    st.warning(f"⚠️ 只有本地算法在工作 (AI 离线)")
+    st.caption(f"原因: {ai_status_msg}。请去 Manage App -> Settings -> Secrets 填入 GOOGLE_API_KEY。")
 
-# --- 4. 核心功能 (Tab) ---
-tab1, tab2 = st.tabs(["🎙️ 语音翻译", "📹 视频同传"])
+# --- 4. 核心功能区 (Tab) ---
+tab1, tab2 = st.tabs(["🎙️ 语音接收", "📹 视频同传"])
 
 # === Tab 1: 语音 ===
 with tab1:
-    st.markdown("##### 1. 录下主子的声音")
-    audio_file = st.file_uploader("点击录音 (支持 m4a/mp3/wav)", type=["wav", "mp3", "m4a", "aac"], label_visibility="collapsed")
+    st.markdown("##### 1. 采集声波 (录音/上传)")
+    # 这里的 label 会显示为中文，但下方按钮语言取决于浏览器
+    audio_file = st.file_uploader("支持 wav/mp3/m4a/aac", type=["wav", "mp3", "m4a", "aac"], key="audio_up")
     
-    st.markdown("##### 2. (可选) 拍张照提高准确度")
-    with st.expander("📸 点击展开相机", expanded=False):
+    st.markdown("##### 2. (可选) 拍张照/录像提高准确度")
+    # Camera Input 只能拍照，文案修改以符合实际功能
+    with st.expander("📸 开启相机抓拍", expanded=False):
         img_cam = st.camera_input("拍摄猫咪表情")
-    img_up = st.file_uploader("或从相册上传", type=["jpg", "png"], label_visibility="collapsed")
+    img_up = st.file_uploader("或从相册上传图片", type=["jpg", "png"], key="img_up", label_visibility="collapsed")
     img_final = img_cam if img_cam else img_up
 
-    if st.button("✨ 开始翻译 ✨", key="btn_audio"):
+    if st.button("📡 开始解码信号", key="btn_audio"):
         if not audio_file:
-            st.warning("请先喂我一段录音喵！")
+            st.error("请先上传一段喵叫声！")
         else:
-            with st.spinner("🐈 正在分析声波与微表情..."):
+            with st.spinner("正在分析 50Hz 生物电波..."):
                 data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
                 
                 if data['status'] == 'error':
-                    st.error(f"❌ 解析失败: {data['msg']}")
+                    st.error(f"❌ 信号干扰: {data['msg']}")
                 else:
-                    # 构建本地逻辑结论 (兜底)
-                    local_logic = ""
-                    if data['duration'] < 0.6: local_logic += " (短促音:打招呼/确认)"
-                    elif data['duration'] > 1.2: local_logic += " (长音:需求/抱怨)"
+                    # 本地逻辑
+                    local_logic = []
+                    if data['duration'] < 0.6: local_logic.append("短促音(打招呼)")
+                    elif data['duration'] > 1.2: local_logic.append("长音(需求/抱怨)")
                     
-                    if "Rising" in data['pitch_trend']: local_logic += " + (升调:疑问/请求)"
-                    elif "Falling" in data['pitch_trend']: local_logic += " + (降调:拒绝/陈述)"
+                    if "Rising" in data['pitch_trend']: local_logic.append("升调(疑问/请求)")
+                    elif "Falling" in data['pitch_trend']: local_logic.append("降调(拒绝/陈述)")
                     
+                    logic_str = " + ".join(local_logic)
+
                     # AI 分析
                     ai_result = ""
                     if ai_ready:
                         try:
                             prompt = f"""
-                            你现在就是这只猫。请根据以下数据，用**第一人称**翻译你的心声。
-                            
-                            【传感器数据】
-                            1. 场景：{context}
-                            2. 声音特征：{data['pitch_trend']}，时长{data['duration']}秒，粗糙度(嘶吼)={'是' if data['is_rough'] else '否'}。
-                            3. 逻辑推断参考：{local_logic}
-                            
-                            【要求】
-                            - 语气：傲娇、可爱或急切（根据数据判断）。
-                            - 格式：直接说出你想说的话，不要带引号，不要说“这只猫”。
-                            - 如果包含视觉图片，请结合图片中的耳朵/瞳孔/尾巴状态修正翻译。
+                            角色：你就是这只猫。
+                            任务：用【第一人称】翻译你的心声。
+                            数据：
+                            - 场景：{context}
+                            - 声音特征：{data['pitch_trend']}，时长{data['duration']}秒。
+                            - 逻辑参考：{logic_str}
+                            要求：
+                            - 语气：傲娇、可爱或急切。
+                            - 不要说“这只猫”，直接说“本喵”或“我”。
+                            - 简短有力，像发微信一样。
                             """
                             inputs = [prompt]
                             if img_final: inputs.append(Image.open(img_final))
                             ai_result = model.generate_content(inputs).text
-                        except Exception as e: st.error(f"AI 连接中断: {e}")
+                        except Exception as e: st.error(f"云端连接中断: {e}")
 
-                    # 结果展示
-                    st.success("✅ 翻译完成")
+                    st.success("✅ 解码成功")
                     
-                    # 萌化数据展示
+                    # 萌化数据卡片
                     c1, c2, c3 = st.columns(3)
                     c1.metric("情绪", data['pitch_trend'].split()[0])
-                    c2.metric("音长", f"{data['duration']}s")
-                    c3.metric("嘶吼指数", "高!!" if data['is_rough'] else "低")
+                    c2.metric("时长", f"{data['duration']}s")
+                    c3.metric("哈气值", "高!!" if data['is_rough'] else "低")
 
                     st.markdown("### 🐱 主子说：")
                     if ai_result:
                         st.info(f"“ {ai_result} ”")
                     else:
-                        # 本地兜底文案
-                        fallback_msg = "快理理我！" if "Rising" in data['pitch_trend'] else "朕现在不想动。"
-                        st.info(f"（AI 休息中）本地分析：{fallback_msg} \n\n *依据：{local_logic}*")
+                        st.info(f"（AI 离线）本地推断：大概是【{logic_str}】的意思。")
 
-                    # 校准按钮
-                    if st.button("🎯 这就是它平时的声音 (设为基准)"):
+                    if st.button("🎯 记住这个声音 (设为基准)"):
                         st.session_state['baseline_pitch'] = data['mean_pitch']
-                        st.toast("记住了喵！下次以此为准。")
+                        st.toast("已录入声纹库！")
                         time.sleep(1)
 
 # === Tab 2: 视频 ===
 with tab2:
-    st.info("💡 提示：点击下方选择 **“录像”** 或 **“从相册选择”**。")
-    video_file = st.file_uploader("📹 上传视频", type=["mp4", "mov", "avi", "m4v"], label_visibility="collapsed")
+    st.info("💡 提示：点击下方按钮 -> 选择 **“录像”** 或 **“从图库选择”**。")
+    video_file = st.file_uploader("📹 上传视频文件", type=["mp4", "mov", "avi", "m4v"], key="video_up")
 
-    if st.button("🎬 视频同传 🎬", key="btn_video"):
+    if st.button("🎬 分析视频信号", key="btn_video"):
         if not video_file:
-            st.warning("没有视频怎么看喵？")
+            st.warning("请先上传视频喵！")
         else:
-            with st.spinner("⏳ 正在分离音轨并进行多模态分析..."):
+            with st.spinner("正在分离音轨并分析肢体语言..."):
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 tfile.write(video_file.read())
                 video_path = tfile.name
@@ -221,8 +225,8 @@ with tab2:
                     data = analyze_audio_advanced(audio_path, st.session_state['baseline_pitch'])
                     
                     if data['status'] == 'error':
-                        st.warning("⚠️ 视频里好像没有猫叫声？将仅分析动作。")
-                        data = {"pitch_trend": "未知", "mean_pitch": 0, "is_rough": False, "duration": 0}
+                        st.warning("⚠️ 未检测到猫叫声，将仅分析动作。")
+                        data = {"pitch_trend": "未知", "duration": 0} # 兜底
                     
                     ai_msg = ""
                     if ai_ready:
@@ -233,11 +237,10 @@ with tab2:
                                 video_blob = genai.get_file(video_blob.name)
 
                             prompt = f"""
-                            你就是视频里的这只猫。
-                            结合你的动作（尾巴/耳朵/姿态）和刚才的声音数据（{data}），
-                            用**第一人称**告诉人类你在想什么。
+                            角色：你就是视频里的这只猫。
+                            任务：结合你的动作（尾巴/耳朵）和声音（{data}），用【第一人称】吐槽或表达需求。
                             场景：{context}。
-                            语气要生动！
+                            语气：生动、有趣、二次元。
                             """
                             response = model.generate_content([prompt, video_blob])
                             ai_msg = response.text
