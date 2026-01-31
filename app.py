@@ -3,7 +3,6 @@ import google.generativeai as genai
 import os
 import time
 import tempfile
-import base64
 from PIL import Image
 from utils import analyze_audio_advanced, extract_audio_from_video
 
@@ -25,7 +24,7 @@ if 'baseline_pitch' not in st.session_state:
 if 'latest_analysis' not in st.session_state:
     st.session_state['latest_analysis'] = None
 
-# --- 2. CSS 拿铁风深度定制 ---
+# --- 2. CSS 拿铁风定制 (UI 升级) ---
 st.markdown("""
 <style>
     /* 全局背景 */
@@ -43,11 +42,10 @@ st.markdown("""
     .header-img {
         display: flex;
         justify_content: center;
-        align-items: center;
         margin-bottom: 10px;
     }
     /* 卡片样式 */
-    .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"], .stSelectbox > div > div {
+    .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"], .stSelectbox {
         background-color: #FFFFFF !important;
         border-radius: 20px !important;
         border: 2px solid #EFEBE9 !important;
@@ -71,19 +69,11 @@ st.markdown("""
         box-shadow: 0 6px 15px rgba(139, 69, 19, 0.5);
         background: linear-gradient(45deg, #E67E22, #A0522D);
     }
-    /* Tab 样式 */
-    .stTabs [data-baseweb="tab"] {
-        background-color: #F5E6D3;
-        border-radius: 15px 15px 0 0;
-        color: #5D4037;
-        font-weight: bold;
+    /* 进度条颜色 */
+    .stProgress > div > div > div > div {
+        background-color: #D2691E;
     }
-    .stTabs [aria-selected="true"] {
-        background-color: #FFFFFF;
-        border-top: 3px solid #D2691E;
-        color: #D2691E;
-    }
-    p, label, .stMarkdown, li, .stCaption {
+    p, label, .stMarkdown, li {
         color: #4E342E !important;
         font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
     }
@@ -93,68 +83,52 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 资源定义 ---
-# (1) 顶部 Logo：读取本地 logo.gif
-def render_local_logo(width=200):
-    if os.path.exists("logo.gif"):
-        with open("logo.gif", "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-        return f'<div class="header-img"><img src="data:image/gif;base64,{b64}" width="{width}" style="border-radius:15px"></div>'
-    else:
-        # 兜底网络图 (DJ猫)
-        return f'<div class="header-img"><img src="https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif" width="{width}"></div>'
+# --- 3. 资源定义 (GIF 分离) ---
+# 看板 GIF：DJ 猫 (符合电台设定)
+HEADER_GIF = "https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif"
+# 等待 GIF：打字/计算猫 (符合 AI 设定)
+LOADING_GIF = "https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif"
 
-# (2) 等待动画：内置 Base64 打字猫 (确保100%加载)
-# 这是一串很长的代码，代表那张 GIF 图片
-LOADING_CAT_B64 = "R0lGODlhZABkAPQAAP///wAAAPj4+Dg4OISEhMwMDAQEBBwcHJycHIyMjFBQUCgoKKioqLi4uDQ0FAQEBHx8fLy8vPz8/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh/h1HaWZCdWlsZGVyIDAuMiBieSBYvesgUGlndXVjACH+QQECgAAACwAAAAAZABkAAAF/iAljmRpnmiqrmzrvnAsz3Rt33iu73zv/8CgcEgsGo/IpHLJbDqf0Kh0Sq1ar9isdsvter/gsHhMLpvP6LR6zW673/C4fE6v2+/4vH7P7/v/gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAwocSLCgwYMIEypcyLChw4cQI0qcSLGixYsYM2rcyLGjx48gQ4ocSbKkyZMo/lOqXMmypcuXMGPKnEmzps2bOHPq3Mmzp8+fQIMKHUq0qNGjSJMqXcq0qdOnUKNKnUq1qtWrWLNq3cq1q9evYMOKHUu2rNmzaNOqXcu2rdu3cOPKnUu3rt27ePPq3cu3r9+/gAMLHky4sOHDiBMrXsy4sePHkCNLnky5suXLmDNr3sy5s+fPoEOLHk26tOnTqFOrXs26tevXsGPLnk27tu3buHPr3s27t+/fwIMLH068uPHjyJMrX868ufPn0KNLn069uvXr2LNr3869u/fv4MOLH0++vPnz6NOrX8++vfv38OPLn0+/vv37+PPr38+/v///AAYo4IAEFmjggQgmqOBCDDbo4IMQRijhhBRWaOGFGGao4YYcdujhhyCGKOKIJJZo4okopqjiiiy26OKLMMYo44w01mjjjTjmqOOOPPbo449ABinkkEQWaeSRSCap5JJMNunkk1BGKeWUVFZp5ZVYZqnlllx26eWXYIYp5phklmnmmWimqeaabLbp5ptwxinnnHTWaeedeOap55589unnn4AGKuighBZq6KGIJqrooow26uijkEYq6aSUVmrppZhmqummnHbq6aeghirqqKSWauqpqKaq6qqsturqq7DGKuustNZq66245qrrrrz26uuvwAYr7LDEFmvsscgmq+yyzDbr7LPQRivttNRWa+212Gar7bbcduvtt+CGK+645JZr7rnopqvuuuy26+678MYr77z01mvvvfjmq+++/Pbr778AByzwwAQXbPDBCCes8MIMN+zwwxBHLPHEFFds8cUYZ6zxxhx37PHHIIcs8sgkl2zyySinrPLKLLfs8sswxyzzzDTXbPPNOOes88489+zzz0AHLfTQRBdt9NFIJ6300kw37fTTUEct9dRU7wcBADs="
-
-def render_loading_gif(width=150):
-    return f'<div class="header-img"><img src="data:image/gif;base64,{LOADING_CAT_B64}" width="{width}"></div>'
-
-# --- 4. 界面渲染 ---
-# 顶部看板 (常驻)
-st.markdown(render_local_logo(), unsafe_allow_html=True)
+# --- 4. 顶部看板 ---
+st.markdown(f'<div class="header-img"><img src="{HEADER_GIF}" width="180" style="border-radius:10px"></div>', unsafe_allow_html=True)
 st.title("🐱 喵星电波台")
 st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
 
-# 科学原理
-with st.expander("🔬 喵星发声学原理 (Science)", expanded=False):
-    st.markdown("""
-    **本台解码算法基于瑞典隆德大学 Susanne Schötz 教授的猫语旋律学研究：**
-    * **🎵 升调**: 疑问/请求/确认。
-    * **🎵 降调**: 陈述/拒绝/自信。
-    * **⏳ 时长**: 短音=问候；长音=抱怨/需求。
-    """)
-
-# 信号控制台
+# --- 5. 核心控制台 (场景选择移出折叠区) ---
 st.markdown("### 🎛️ 信号控制台")
+
+# [核心修改] 场景选择直接展示，且增加默认无效选项
 scenario_options = [
-    "🚫 请选择发射源 (必选)", "🍽️ 干饭时刻 (Food)", "🚪 门窗/受阻 (Barrier)", 
-    "🛋️ 贴贴/求摸 (Affection)", "🏥 害怕/应激 (Stress)", 
-    "🦋 猎杀时刻 (Hunting)", "😡 别挨老子 (Warning)", "🌙 深夜跑酷 (Night)"
+    "🚫 请选择发射源 (必选)", 
+    "🍽️ 干饭时刻 (Food)", 
+    "🚪 门窗/受阻 (Barrier)", 
+    "🛋️ 贴贴/求摸 (Affection)", 
+    "🏥 害怕/应激 (Stress)", 
+    "🦋 猎杀时刻 (Hunting)", 
+    "😡 别挨老子 (Warning)", 
+    "🌙 深夜跑酷 (Night)"
 ]
 context = st.selectbox("📍 1. 锁定信号发射源 (必选)", scenario_options, label_visibility="collapsed")
 
-# 校准设置
-with st.expander("⚙️ 高级设置：声纹校准", expanded=False):
-    calib_file = st.file_uploader("上传校准录音", type=["wav", "mp3", "m4a", "aac"], key="cal_up", label_visibility="collapsed")
+# 科学原理与校准 (依然折叠，保持整洁)
+with st.expander("🔬 高级设置 (原理 / 校准)", expanded=False):
+    st.markdown("**喵星发声学原理:** 升调↗=请求; 降调↘=拒绝; 长音=抱怨。")
+    st.markdown("---")
+    st.markdown("**声纹校准:**")
+    
+    calib_file = st.file_uploader("上传一段“放松喵叫”校准:", type=["wav", "mp3", "m4a", "aac"], key="cal_up")
     if calib_file:
         if st.button("⚡ 设为基准"):
-            with st.spinner("校准中..."):
-                cal_data = analyze_audio_advanced(calib_file, baseline_pitch=None)
-                if cal_data['status'] != 'error':
-                    st.session_state['baseline_pitch'] = cal_data['mean_pitch']
-                    st.success(f"✅ 已校准: {cal_data['mean_pitch']}Hz")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("校准失败")
-    col_s, col_c = st.columns([3,1])
-    with col_s:
-        if st.session_state['baseline_pitch']: st.success(f"当前基准: {st.session_state['baseline_pitch']}Hz")
-        else: st.info("尚未录入基准")
-    with col_c:
-        if st.button("清除"):
+            cal_data = analyze_audio_advanced(calib_file, baseline_pitch=None)
+            if cal_data['status'] != 'error':
+                st.session_state['baseline_pitch'] = cal_data['mean_pitch']
+                st.success(f"已校准: {cal_data['mean_pitch']}Hz")
+                time.sleep(1)
+                st.rerun()
+    
+    if st.session_state['baseline_pitch']:
+        st.caption(f"当前基准: {st.session_state['baseline_pitch']}Hz")
+        if st.button("清除缓存"):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
@@ -164,6 +138,7 @@ try:
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
         genai.configure(api_key=api_key)
+        # 使用你验证过的可用模型
         model = genai.GenerativeModel(
             model_name='gemini-flash-latest',
             system_instruction="你是一只猫。用第一人称（'本喵'、'我'）。禁止解释。语气生动傲娇。根据场景和声音特征翻译心声。"
@@ -174,7 +149,7 @@ try:
 except Exception:
     st.error("⚠️ AI 初始化失败")
 
-# --- 5. 业务功能区 ---
+# --- 6. 业务功能区 ---
 st.markdown("### 📡 信号接收区")
 tab1, tab2 = st.tabs(["🎙️ 语音解码", "📹 视频解码"])
 
@@ -187,27 +162,27 @@ with tab1:
         img_up = st.file_uploader("或上传图片", type=["jpg", "png"], key="img_up")
     img_final = img_cam if img_cam else img_up
 
-    # [修改点] 按钮文案回归电台风
-    if st.button("📡 接收喵星电波", key="btn_audio"):
+    if st.button("▶️ 开始解码", key="btn_audio"):
+        # [逻辑优化] 强制检查场景选择
         if "🚫" in context:
             st.error("⚠️ 无法解码：请先在上方控制台选择【信号发射源】！")
         elif not audio_file:
             st.error("⚠️ 请先上传喵叫声！")
         else:
-            # === 等待特效 (Base64 必显版) ===
+            # === 修复版等待特效 ===
             loading = st.empty()
             
             # 阶段 1
             with loading.container():
-                st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
-                st.info("📡 正在连接喵星基站 (50Hz)...")
+                st.markdown(f'<div class="header-img"><img src="{LOADING_GIF}" width="150"></div>', unsafe_allow_html=True)
+                st.info("📡 正在连接喵星基站 (50Hz)...") # 文字现在肯定能显示
                 st.progress(20)
             
             data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
             
             # 阶段 2
             with loading.container():
-                st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                st.markdown(f'<div class="header-img"><img src="{LOADING_GIF}" width="150"></div>', unsafe_allow_html=True)
                 st.info("🐈 正在破译加密电波...")
                 st.progress(60)
 
@@ -223,11 +198,12 @@ with tab1:
                         if img_final: inputs.append(Image.open(img_final))
                         ai_result = model.generate_content(inputs).text
                     except: 
-                        st.warning("云端信号弱，转为离线分析。")
+                        st.warning("云端连接不稳定，转为离线模式。")
 
-                loading.empty() # 清除等待动画
+                loading.empty() # 清除等待动画，恢复原本的 Header
 
-                st.success("✅ 电波接收成功")
+                # 结果展示
+                st.success("✅ 解码成功")
                 c1, c2, c3 = st.columns(3)
                 c1.metric("情绪", data['pitch_trend'].split()[0])
                 c2.metric("时长", f"{data['duration']}s")
@@ -243,8 +219,7 @@ with tab1:
 with tab2:
     video_file = st.file_uploader("上传视频", type=["mp4", "mov", "avi", "m4v"], key="video_up", label_visibility="collapsed")
 
-    # [修改点] 按钮文案
-    if st.button("📡 接收视频信号", key="btn_video"):
+    if st.button("▶️ 分析视频", key="btn_video"):
         if "🚫" in context:
             st.error("⚠️ 无法解码：请先在上方控制台选择【信号发射源】！")
         elif not video_file:
@@ -252,7 +227,7 @@ with tab2:
         else:
             loading = st.empty()
             with loading.container():
-                st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                st.markdown(f'<div class="header-img"><img src="{LOADING_GIF}" width="150"></div>', unsafe_allow_html=True)
                 st.info("🎞️ 正在分离音轨 & 逐帧解析...")
                 st.progress(30)
 
@@ -271,7 +246,7 @@ with tab2:
                 ai_msg = ""
                 if ai_ready:
                     with loading.container():
-                        st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                        st.markdown(f'<div class="header-img"><img src="{LOADING_GIF}" width="150"></div>', unsafe_allow_html=True)
                         st.info("🧠 AI 大脑疯狂运转中...")
                         st.progress(80)
                     try:
