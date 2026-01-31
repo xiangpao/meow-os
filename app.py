@@ -112,9 +112,8 @@ with st.expander("🔬 喵星发声学原理 (Science)", expanded=False):
     * **⏳ 时长**: 短音(<0.5s)为问候；长音(>1s)为强烈需求。
     """)
 
-# --- 设置与校准区 (核心修改) ---
+# --- 设置与校准区 ---
 with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
-    # 1. 场景选择
     context = st.selectbox(
         "📍 信号发射源 (当前场景)",
         ["🍽️ 干饭时刻 (Food)", "🚪 门窗/受阻 (Barrier)", "🛋️ 贴贴/求摸 (Affection)", "🏥 害怕/应激 (Stress)", "🦋 猎杀时刻 (Hunting)", "😡 别挨老子 (Warning)", "🌙 深夜跑酷 (Night)"]
@@ -123,8 +122,7 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
     st.markdown("---")
     st.markdown("**🎛️ 声纹校准控制台**")
 
-    # 2. [新增] 独立校准上传区
-    # 这里允许用户直接上传文件进行校准，不需要去下面跑流程
+    # 独立校准上传区
     calib_file = st.file_uploader(
         "🎙️ 上传一段“平时最放松的喵叫” (仅校准)", 
         type=["wav", "mp3", "m4a", "aac"], 
@@ -135,9 +133,7 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
     if calib_file:
         if st.button("⚡ 立即分析并设为基准", key="btn_cal_direct"):
             with st.spinner("正在提取声纹特征..."):
-                # 调用核心算法，不传入基准，只提取数据
                 cal_data = analyze_audio_advanced(calib_file, baseline_pitch=None)
-                
                 if cal_data['status'] == 'error':
                     st.error(f"❌ 校准失败: {cal_data['msg']}")
                 else:
@@ -149,23 +145,17 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
 
     st.markdown("---")
 
-    # 3. 状态显示与清除区 (双栏布局)
     col_status, col_clear = st.columns([2, 1])
-    
     with col_status:
-        # 左侧：显示当前状态
         if st.session_state['baseline_pitch']: 
             st.success(f"✅ 当前基准: {st.session_state['baseline_pitch']}Hz")
         else: 
             st.info("💡 尚未录入基准")
-            
     with col_clear:
-        # 右侧：清除按钮
         if st.button("🗑️ 清除缓存"):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
-    # 4. 保留“从翻译结果校准”的快捷方式 (不冲突，多一种选择)
     if st.session_state.get('latest_analysis') and st.session_state['latest_analysis']['type'] == 'audio':
         last_pitch = st.session_state['latest_analysis']['data']['mean_pitch']
         if st.button(f"🎯 将刚才的翻译结果 ({last_pitch}Hz) 设为基准"):
@@ -181,7 +171,20 @@ try:
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # [修改点] 系统指令：强制锁定猫的身份
+        generation_config = {
+            "temperature": 0.7,
+            "max_output_tokens": 100,
+        }
+        system_instruction = "你是一只猫。你只能用猫的视角和口吻说话。禁止使用任何第三人称描述（如'这只猫'、'它'）。禁止解释你的回答。直接输出你的心声。语气要符合猫的性格（傲娇、慵懒、或急切）。"
+        
+        # 尝试实例化模型
+        model = genai.GenerativeModel(
+            model_name='gemini-1.5-flash',
+            system_instruction=system_instruction, # 注入系统指令
+            generation_config=generation_config
+        )
         ai_ready = True
     else:
         ai_status_msg = "密钥缺失"
@@ -227,18 +230,21 @@ with tab1:
                     ai_result = ""
                     if ai_ready:
                         try:
+                            # [修改点] Prompt 简化，因为已经有 System Instruction 坐镇了
                             prompt = f"""
-                            角色：你就是这只猫。用【第一人称】翻译你的心声。
-                            场景：{context}
+                            当前环境：{context}
                             声音特征：{data['pitch_trend']}，时长{data['duration']}秒。
-                            逻辑参考：{logic_str}
-                            要求：语气傲娇、可爱或急切。不要说“这只猫”，直接说“本喵”或“我”。简短有力。
+                            请根据以上信息，翻译我（猫）这一刻在说什么。
                             """
                             inputs = [prompt]
                             if img_final: inputs.append(Image.open(img_final))
                             ai_result = model.generate_content(inputs).text
-                        except Exception as e: st.error(f"云端连接中断: {e}")
-                    
+                        except Exception as e: 
+                            # 如果 1.5-flash 依然报错，尝试 fallback 到旧模型（虽然不推荐，但为了容错）
+                            st.error(f"云端连接中断: {e}")
+                            if "404" in str(e):
+                                st.caption("提示：请检查 requirements.txt 是否已更新为 google-generativeai>=0.7.2")
+
                     st.session_state['latest_analysis'] = {
                         "data": data,
                         "ai_result": ai_result,
@@ -297,10 +303,11 @@ with tab2:
                                 time.sleep(1)
                                 video_blob = genai.get_file(video_blob.name)
 
+                            # [修改点] Prompt 简化
                             prompt = f"""
-                            角色：你就是视频里的这只猫。
-                            任务：结合动作（尾巴/耳朵）和声音（{data}），用【第一人称】吐槽或表达需求。
-                            场景：{context}。语气生动、有趣。
+                            观察我的动作（尾巴/耳朵）和听我的声音（{data}）。
+                            环境：{context}。
+                            告诉我（猫）现在在抱怨什么或要什么。
                             """
                             response = model.generate_content([prompt, video_blob])
                             ai_msg = response.text
