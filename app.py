@@ -114,7 +114,7 @@ def render_loading_gif(width=150):
 # 顶部看板 (常驻)
 st.markdown(render_local_logo(), unsafe_allow_html=True)
 st.title("🐱 喵星电波台")
-st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密喵声 ——</i></p>", unsafe_allow_html=True)
 
 # 科学原理
 with st.expander("🔬 喵星发声学原理 (Science)", expanded=False):
@@ -331,4 +331,5 @@ with tab2:
                 os.remove(video_path)
                 os.remove(audio_path)
             except: pass
+
 
