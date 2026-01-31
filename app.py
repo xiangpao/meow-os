@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 清除可能存在的代理设置 (防止云端报错)
+# 清除代理
 if "HTTP_PROXY" in os.environ: del os.environ["HTTP_PROXY"]
 if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 
@@ -23,7 +23,6 @@ if 'baseline_pitch' not in st.session_state:
     st.session_state['baseline_pitch'] = None
 
 # --- 1. CSS 拿铁风深度定制 ---
-# ⚠️ 注意：下面这段代码必须以 """ 开头，以 """ 结尾，千万不要漏掉！
 st.markdown("""
 <style>
     /* 全局背景：热牛奶白 -> 浅拿铁渐变 */
@@ -46,7 +45,7 @@ st.markdown("""
         margin-bottom: -10px;
     }
     
-    /* 卡片/折叠面板：像一块白色的方糖 */
+    /* 卡片/折叠面板 */
     .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"] {
         background-color: #FFFFFF !important;
         border-radius: 20px !important;
@@ -54,7 +53,7 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(93, 64, 55, 0.1) !important;
     }
     
-    /* 按钮：焦糖色果冻质感 */
+    /* 按钮：焦糖色 */
     .stButton>button {
         width: 100%;
         background: linear-gradient(45deg, #D2691E, #8B4513);
@@ -73,7 +72,7 @@ st.markdown("""
         background: linear-gradient(45deg, #E67E22, #A0522D);
     }
     
-    /* Tab 标签页美化 */
+    /* Tab 样式 */
     .stTabs [data-baseweb="tab"] {
         background-color: #F5E6D3;
         border-radius: 15px 15px 0 0;
@@ -86,22 +85,26 @@ st.markdown("""
         color: #D2691E;
     }
     
-    /* 字体颜色优化 */
+    /* 字体优化 */
     p, label, .stMarkdown {
         color: #4E342E !important;
         font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
     }
     
-    /* 隐藏上传组件自带的边框 */
+    /* 隐藏边框 */
     [data-testid="stFileUploadDropzone"] {
         border: 2px dashed #D7CCC8 !important;
     }
 </style>
-""", unsafe_allow_html=True) 
-# ^^^ 上面这一行非常重要，一定不能漏掉！ ^^^
+""", unsafe_allow_html=True)
 
-# --- 2. 顶部看板 (Bongo Cat) ---
-st.image("https://media.giphy.com/media/u1SH63nB18TSk/giphy.gif", width=200)
+# --- 2. 顶部看板 (双保险模式) ---
+# 优先读取本地文件，如果没有则使用网络备用图
+if os.path.exists("logo.gif"):
+    st.image("logo.gif", width=180)
+else:
+    # 备用网络图 (Cat Jam)
+    st.image("https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif", width=180)
 
 st.title("☕ 喵星电波台")
 st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
