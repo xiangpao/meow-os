@@ -3,6 +3,7 @@ import google.generativeai as genai
 import os
 import time
 import tempfile
+import base64  # <--- 新增：用于处理动图编码
 from PIL import Image
 from utils import analyze_audio_advanced, extract_audio_from_video
 
@@ -40,8 +41,10 @@ st.markdown("""
     }
     
     /* 顶部图片居中 */
-    .stImage {
-        text-align: center;
+    .stImage, .css-1v0mbdj {
+        display: flex;
+        justify_content: center;
+        align-items: center;
         margin-bottom: -10px;
     }
     
@@ -98,13 +101,29 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 顶部看板 (双保险模式) ---
-# 优先读取本地文件，如果没有则使用网络备用图
-if os.path.exists("logo.gif"):
-    st.image("logo.gif", width=180)
-else:
-    # 备用网络图 (Cat Jam)
-    st.image("https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif", width=180)
+# --- 2. 顶部看板 (修复动图不动的问题) ---
+# 定义一个函数：把图片转换成 HTML 代码，强制浏览器播放
+def render_gif(gif_path, width=200):
+    try:
+        # 尝试读取本地文件
+        with open(gif_path, "rb") as f:
+            data = f.read()
+        # 转换成 base64 编码
+        b64 = base64.b64encode(data).decode()
+        # 注入 HTML
+        st.markdown(
+            f'<div style="text-align: center;"><img src="data:image/gif;base64,{b64}" width="{width}"></div>', 
+            unsafe_allow_html=True
+        )
+    except:
+        # 如果本地没有文件，或者读取失败，使用网络备用图
+        st.markdown(
+            f'<div style="text-align: center;"><img src="https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif" width="{width}"></div>', 
+            unsafe_allow_html=True
+        )
+
+# 调用函数显示 logo.gif
+render_gif("logo.gif")
 
 st.title("☕ 喵星电波台")
 st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
