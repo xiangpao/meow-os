@@ -3,7 +3,7 @@ import google.generativeai as genai
 import os
 import time
 import tempfile
-import base64  # <--- 新增：用于处理动图编码
+import base64
 from PIL import Image
 from utils import analyze_audio_advanced, extract_audio_from_video
 
@@ -48,7 +48,7 @@ st.markdown("""
         margin-bottom: -10px;
     }
     
-    /* 卡片/折叠面板 */
+    /* 卡片/折叠面板/上传框 */
     .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"] {
         background-color: #FFFFFF !important;
         border-radius: 20px !important;
@@ -89,7 +89,7 @@ st.markdown("""
     }
     
     /* 字体优化 */
-    p, label, .stMarkdown {
+    p, label, .stMarkdown, li {
         color: #4E342E !important;
         font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
     }
@@ -101,32 +101,39 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 顶部看板 (修复动图不动的问题) ---
-# 定义一个函数：把图片转换成 HTML 代码，强制浏览器播放
+# --- 2. 顶部看板 (动图引擎) ---
 def render_gif(gif_path, width=200):
     try:
-        # 尝试读取本地文件
         with open(gif_path, "rb") as f:
             data = f.read()
-        # 转换成 base64 编码
         b64 = base64.b64encode(data).decode()
-        # 注入 HTML
         st.markdown(
             f'<div style="text-align: center;"><img src="data:image/gif;base64,{b64}" width="{width}"></div>', 
             unsafe_allow_html=True
         )
     except:
-        # 如果本地没有文件，或者读取失败，使用网络备用图
         st.markdown(
             f'<div style="text-align: center;"><img src="https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif" width="{width}"></div>', 
             unsafe_allow_html=True
         )
 
-# 调用函数显示 logo.gif
+# 显示 Logo
 render_gif("logo.gif")
 
 st.title("☕ 喵星电波台")
 st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
+
+# --- [新增] 科学原理科普区 ---
+with st.expander("🔬 喵星发声学原理 (Science)", expanded=False):
+    st.markdown("""
+    **本台解码算法基于瑞典隆德大学 Susanne Schötz 教授的猫语旋律学研究：**
+    * **🎵 升调 (Rising Pitch ↗)**: 类似人类的疑问句，通常代表**请求 (Soliciting)** 或 **友好的确认**。
+    * **🎵 降调 (Falling Pitch ↘)**: 类似人类的陈述句，通常代表**拒绝**、**压力**或**自信的陈述**。
+    * **⏳ 时长 (Duration)**: 
+        * 短促音 (<0.5s): 社交问候 / 确认存在。
+        * 长音 (>1.0s): 强烈需求 (我要吃!) / 抱怨 (放我出去!)。
+    * **🌊 粗糙度 (Roughness)**: 声音嘶哑或带杂音，通常对应**防御**、**痛苦**或**极度亢奋**。
+    """)
 
 # 设置区
 with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
@@ -180,7 +187,8 @@ with tab1:
     st.markdown("##### 1. 采集声波 (录音/上传)")
     audio_file = st.file_uploader("支持 wav/mp3/m4a/aac", type=["wav", "mp3", "m4a", "aac"], key="audio_up", label_visibility="collapsed")
     
-    st.markdown("##### 2. (可选) 增加视觉数据")
+    # [修改点] 文案修改为“增加照片”
+    st.markdown("##### 2. (可选) 增加照片")
     with st.expander("📷 开启相机抓拍", expanded=False):
         img_cam = st.camera_input("拍摄猫咪表情")
     img_up = st.file_uploader("或从相册上传图片", type=["jpg", "png"], key="img_up", label_visibility="collapsed")
