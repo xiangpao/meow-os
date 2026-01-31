@@ -104,7 +104,7 @@ def render_local_logo(width=200):
         # 兜底网络图
         return f'<div class="header-img"><img src="https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif" width="{width}"></div>'
 
-# (2) 等待动画：使用指定的 Giphy 链接
+# (2) 等待动画：打字猫链接
 LOADING_GIF = "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif"
 
 def render_loading_gif(width=150):
@@ -192,27 +192,35 @@ with tab1:
         elif not audio_file:
             st.error("⚠️ 请先上传喵叫声！")
         else:
-            # === 等待特效 (新 GIF) ===
+            # === 剧情模式加载 ===
             loading = st.empty()
             
-            # 阶段 1
+            # 0% 阶段
             with loading.container():
                 st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
-                st.info("📡 正在连接喵星基站 (50Hz)...")
-                st.progress(20)
+                st.info("📡 正在连接喵星基站...")
+                st.progress(0)
+            time.sleep(0.5) # 增加微小延迟让用户看清文案
+
+            # 30% 阶段
+            with loading.container():
+                st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                st.info("📶 发现加密频率，正在握手...")
+                st.progress(30)
             
+            # 执行本地分析
             data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
             
-            # 阶段 2
-            with loading.container():
-                st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
-                st.info("🐈 正在破译加密电波...")
-                st.progress(60)
-
             if data['status'] == 'error':
                 loading.empty()
                 st.error(f"❌ 失败: {data['msg']}")
             else:
+                # 60% 阶段
+                with loading.container():
+                    st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                    st.info("🧠 AI 大脑正在疯狂运转...")
+                    st.progress(60)
+
                 ai_result = ""
                 if ai_ready:
                     try:
@@ -222,6 +230,13 @@ with tab1:
                         ai_result = model.generate_content(inputs).text
                     except: 
                         st.warning("云端信号弱，转为离线分析。")
+
+                # 90% 阶段
+                with loading.container():
+                    st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                    st.info("📩 翻译完成，准备发送！")
+                    st.progress(90)
+                time.sleep(0.5) # 增加微小延迟营造“发送”感
 
                 loading.empty() # 清除等待动画
 
@@ -248,9 +263,18 @@ with tab2:
             st.error("⚠️ 请先上传视频！")
         else:
             loading = st.empty()
+            
+            # 0% 阶段
             with loading.container():
                 st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
-                st.info("🎞️ 正在分离音轨 & 逐帧解析...")
+                st.info("📡 正在连接喵星基站...")
+                st.progress(0)
+            time.sleep(0.5)
+
+            # 30% 阶段
+            with loading.container():
+                st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                st.info("📶 发现加密频率，正在握手...")
                 st.progress(30)
 
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
@@ -264,13 +288,15 @@ with tab2:
                 loading.empty()
                 st.error("❌ 视频无声音")
             else:
+                # 60% 阶段
+                with loading.container():
+                    st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                    st.info("🧠 AI 大脑正在疯狂运转...")
+                    st.progress(60)
+
                 data = analyze_audio_advanced(audio_path, st.session_state['baseline_pitch'])
                 ai_msg = ""
                 if ai_ready:
-                    with loading.container():
-                        st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
-                        st.info("🧠 AI 大脑疯狂运转中...")
-                        st.progress(80)
                     try:
                         video_blob = genai.upload_file(video_path)
                         while video_blob.state.name == "PROCESSING":
@@ -282,6 +308,13 @@ with tab2:
                         ai_msg = response.text
                     except: pass
                 
+                # 90% 阶段
+                with loading.container():
+                    st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
+                    st.info("📩 翻译完成，准备发送！")
+                    st.progress(90)
+                time.sleep(0.5)
+
                 loading.empty()
                 st.success("✅ 完成")
                 st.video(video_file)
