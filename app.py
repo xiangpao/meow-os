@@ -38,7 +38,6 @@ st.markdown("""
         font-weight: 800;
         text-shadow: 2px 2px 0px #FFF;
     }
-    /* 顶部图片容器优化 */
     .header-img {
         display: flex;
         justify_content: center;
@@ -67,18 +66,6 @@ st.markdown("""
         box-shadow: 0 6px 15px rgba(139, 69, 19, 0.5);
         background: linear-gradient(45deg, #E67E22, #A0522D);
     }
-    /* Tab 样式 */
-    .stTabs [data-baseweb="tab"] {
-        background-color: #F5E6D3;
-        border-radius: 15px 15px 0 0;
-        color: #5D4037;
-        font-weight: bold;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #FFFFFF;
-        border-top: 3px solid #D2691E;
-        color: #D2691E;
-    }
     p, label, .stMarkdown, li {
         color: #4E342E !important;
         font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -89,8 +76,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 顶部看板 (修复版) ---
-# 使用稳定的网络图床，不再依赖本地文件
+# --- 3. 顶部看板 (GIF 修复版) ---
+# 使用稳定的网络图床，确保不会黑圈
 bongo_cat_url = "https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif"
 
 st.markdown(
@@ -154,7 +141,7 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
-# --- 连接云端 (模型升级到 2.0) ---
+# --- 连接云端 (降级回 1.5-flash 以确保可用性) ---
 ai_ready = False
 try:
     if "GOOGLE_API_KEY" in st.secrets:
@@ -169,9 +156,9 @@ try:
         语气要生动、二次元，根据数据判断是傲娇、慵懒、还是急切。
         """
         
-        # [核心修改点] 你的账号支持 2.0-flash，我们直接用它！
+        # [核心修改点] 切换回 1.5-flash，这是免费额度最稳定的模型
         model = genai.GenerativeModel(
-            model_name='gemini-2.0-flash', 
+            model_name='gemini-1.5-flash', 
             system_instruction=system_instruction
         )
         ai_ready = True
@@ -201,6 +188,7 @@ with tab1:
             # === 等待特效 ===
             loading_placeholder = st.empty() 
             
+            # 阶段1
             with loading_placeholder.container():
                 st.markdown(f'<div class="header-img"><img src="{bongo_cat_url}" width="150"></div>', unsafe_allow_html=True)
                 st.info("🎧 正在捕获声波特征...")
@@ -209,6 +197,7 @@ with tab1:
             # 本地分析
             data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
             
+            # 阶段2
             with loading_placeholder.container():
                 st.markdown(f'<div class="header-img"><img src="{bongo_cat_url}" width="150"></div>', unsafe_allow_html=True)
                 st.info("📡 正在连接喵星基站 (50Hz)...")
@@ -218,7 +207,6 @@ with tab1:
                 loading_placeholder.empty()
                 st.error(f"❌ 信号干扰: {data['msg']}")
             else:
-                # 逻辑字符串
                 local_logic = []
                 if data['duration'] < 0.6: local_logic.append("短促音(打招呼)")
                 elif data['duration'] > 1.2: local_logic.append("长音(需求/抱怨)")
@@ -229,6 +217,7 @@ with tab1:
                 # AI 分析
                 ai_result = ""
                 if ai_ready:
+                    # 阶段3
                     with loading_placeholder.container():
                         st.markdown(f'<div class="header-img"><img src="{bongo_cat_url}" width="150"></div>', unsafe_allow_html=True)
                         st.info("🐈 正在破译加密电波...")
@@ -244,7 +233,7 @@ with tab1:
                         if img_final: inputs.append(Image.open(img_final))
                         ai_result = model.generate_content(inputs).text
                     except Exception as e: 
-                        st.error(f"云端连接中断: {e}")
+                        st.error(f"云端错误: {e}")
                 
                 loading_placeholder.empty()
 
