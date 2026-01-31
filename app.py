@@ -18,11 +18,11 @@ st.set_page_config(
 if "HTTP_PROXY" in os.environ: del os.environ["HTTP_PROXY"]
 if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 
-# --- 1. 记忆初始化 (关键修复) ---
+# --- 1. 记忆初始化 ---
 if 'baseline_pitch' not in st.session_state:
     st.session_state['baseline_pitch'] = None
 
-# 新增：用于存储最近一次的分析结果，防止页面刷新后结果消失
+# 用于存储最近一次的分析结果，方便在设置里调用
 if 'latest_analysis' not in st.session_state:
     st.session_state['latest_analysis'] = None
 
@@ -113,22 +113,42 @@ with st.expander("🔬 喵星发声学原理 (Science)", expanded=False):
     * **⏳ 时长**: 短音(<0.5s)为问候；长音(>1s)为强烈需求。
     """)
 
-# --- 设置区 ---
+# --- 设置与校准区 (核心修改) ---
 with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
+    # 1. 场景选择
     context = st.selectbox(
         "📍 信号发射源 (当前场景)",
         ["🍽️ 干饭时刻 (Food)", "🚪 门窗/受阻 (Barrier)", "🛋️ 贴贴/求摸 (Affection)", "🏥 害怕/应激 (Stress)", "🦋 猎杀时刻 (Hunting)", "😡 别挨老子 (Warning)", "🌙 深夜跑酷 (Night)"]
     )
+    st.markdown("---")
     
-    c1, c2 = st.columns([2, 1])
-    with c1:
+    # 2. 校准控制台
+    st.markdown("**🎛️ 声纹校准控制台**")
+    
+    # 显示当前状态
+    col_status, col_action = st.columns([2, 1])
+    with col_status:
         if st.session_state['baseline_pitch']: 
-            st.success(f"✅ 已锁定基准: {st.session_state['baseline_pitch']}Hz")
+            st.success(f"✅ 当前基准: {st.session_state['baseline_pitch']}Hz")
         else: 
-            st.info("💡 建议录入一声「平时最放松的叫声」")
-    with c2:
-        if st.button("清除缓存"):
+            # [修改点] 文案补充
+            st.info("💡 建议录入一声「平时最放松的叫声」作为校准")
+            
+    with col_action:
+        if st.button("🗑️ 清除缓存"):
             st.session_state['baseline_pitch'] = None
+            st.rerun()
+
+    # 3. 动态更新按钮 (只有当有分析结果时才显示)
+    if st.session_state.get('latest_analysis') and st.session_state['latest_analysis']['type'] == 'audio':
+        last_pitch = st.session_state['latest_analysis']['data']['mean_pitch']
+        st.caption(f"检测到最近一次分析音高为: **{last_pitch}Hz**")
+        
+        # [修改点] 校准按钮移到了这里
+        if st.button("🎯 将最近一次结果设为基准"):
+            st.session_state['baseline_pitch'] = last_pitch
+            st.toast(f"校准成功！基准已更新为 {last_pitch}Hz")
+            time.sleep(1)
             st.rerun()
 
 # --- 连接云端 ---
@@ -205,7 +225,7 @@ with tab1:
                         "type": "audio"
                     }
 
-    # --- 结果展示区 (独立于按钮逻辑，只要有数据就显示) ---
+    # --- 结果展示区 ---
     if st.session_state['latest_analysis'] and st.session_state['latest_analysis']['type'] == 'audio':
         res = st.session_state['latest_analysis']
         data = res['data']
@@ -223,17 +243,7 @@ with tab1:
         else:
             st.info(f"（AI 离线）本地推断：大概是【{res['logic_str']}】的意思。")
 
-        # 校准按钮 (现在独立显示，点击不会消失了)
-        st.markdown("---")
-        col_cal1, col_cal2 = st.columns([3, 1])
-        with col_cal1:
-            st.caption("如果是平时正常的叫声，建议设为基准，提高以后识别准确率。")
-        with col_cal2:
-            if st.button("🎯 设为基准"):
-                st.session_state['baseline_pitch'] = data['mean_pitch']
-                st.toast("已录入声纹库！下次分析将以此为标准。")
-                time.sleep(1)
-                st.rerun()
+        # [修改点] 底部的校准按钮已移除，现在通过设置面板操作，界面更干净
 
 # === Tab 2: 视频 ===
 with tab2:
@@ -282,11 +292,10 @@ with tab2:
                     st.session_state['latest_analysis'] = {
                         "data": data,
                         "ai_result": ai_msg,
-                        "video_path": video_file, # 这里只存 file uploader 对象回显用
+                        "video_path": video_file,
                         "type": "video"
                     }
                 
-                # 清理
                 try:
                     os.remove(video_path)
                     os.remove(audio_path)
@@ -296,7 +305,6 @@ with tab2:
     if st.session_state['latest_analysis'] and st.session_state['latest_analysis']['type'] == 'video':
         res = st.session_state['latest_analysis']
         st.success("✅ 多模态分析结束")
-        # 注意：video_file 对象在刷新后可能需要重新处理回显，这里直接用上传控件的状态
         if video_file: 
             st.video(video_file)
         
