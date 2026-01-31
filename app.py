@@ -1,187 +1,205 @@
-﻿import streamlit as st
+import streamlit as st
 import google.generativeai as genai
 import os
 import time
+import tempfile
 from PIL import Image
-from utils import analyze_audio_advanced
+from utils import analyze_audio_advanced, extract_audio_from_video
 
 # --- 0. 系统配置 ---
-st.set_page_config(page_title="MeowOS ☕ V4", page_icon="🐾", layout="wide")
+st.set_page_config(page_title="MeowOS 📱", page_icon="🐾", layout="centered", initial_sidebar_state="collapsed")
 
-# ⚠️ 代理设置 (根据你的 Clash 端口保持 7890)
-# os.environ["HTTP_PROXY"] = "http://127.0.0.1:7890"
-# os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
+# ⚠️ 云端部署：必须确保没有设置 Proxy，否则连不上 Google
+if "HTTP_PROXY" in os.environ: del os.environ["HTTP_PROXY"]
+if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 
-# 初始化 Session State (找回“记忆”功能)
 if 'baseline_pitch' not in st.session_state:
     st.session_state['baseline_pitch'] = None
 
-# --- 1. ☕ 拿铁风格 UI 注入 (CSS Injection) ---
+# --- 1. CSS 移动端深度适配 ---
 st.markdown("""
 <style>
-    /* 全局背景：奶油白 */
-    .stApp {
-        background-color: #FFF8E7;
-        color: #5D4037;
-    }
+    .stApp { background-color: #FFF8E7; color: #5D4037; }
     
-    /* 侧边栏：浅拿铁色 */
-    [data-testid="stSidebar"] {
-        background-color: #F5E6D3;
-    }
+    /* 标题与字体优化 */
+    h1 { font-size: 1.8rem !important; text-align: center; color: #6F4E37; }
+    p { font-size: 1.1rem; }
     
-    /* 标题颜色：深咖啡 */
-    h1, h2, h3 {
-        color: #6F4E37 !important;
-        font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif !important;
-    }
-    
-    /* 按钮：焦糖色，圆角 */
+    /* 按钮样式：大圆角，适合手指点击 */
     .stButton>button {
+        width: 100%;
         background-color: #D2691E;
         color: white;
-        border-radius: 20px;
+        border-radius: 25px;
+        height: 55px;
+        font-size: 18px;
+        font-weight: bold;
         border: none;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-        transition: all 0.3s;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+        margin-top: 10px;
     }
-    .stButton>button:hover {
-        background-color: #A0522D;
-        transform: scale(1.05);
+    .stButton>button:active { transform: scale(0.98); background-color: #A0522D; }
+
+    /* Tab 标签页样式 */
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        flex: 1; /* 让Tab等宽 */
+        background-color: #F5E6D3;
+        border-radius: 12px;
+        color: #5D4037;
     }
-    
-    /* 数据卡片：白色圆角卡片 */
-    [data-testid="metric-container"] {
+    .stTabs [aria-selected="true"] {
         background-color: #FFFFFF;
-        border: 2px solid #EFEBE9;
-        border-radius: 15px;
-        padding: 10px;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.05);
-    }
-    
-    /* 文本框高亮 */
-    [data-testid="stMarkdownContainer"] p {
-        font-size: 1.1em;
+        border: 2px solid #D2691E;
+        font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 侧边栏控制台 ---
-st.sidebar.image("https://placekitten.com/300/100", caption="MeowOS Online") # 占位萌图
-st.sidebar.header("⚙️ 设定 (Settings)")
-
-# A. 环境上下文
-context = st.sidebar.selectbox(
-    "📍 当前场景",
-    ["🍽️ 饭点/厨房", "🚪 门窗/阻隔", "🛋️ 互动/撸猫", "🌙 深夜", "🏥 陌生/就医", "🦋 狩猎模式"]
-)
-
-# B. 找回功能：基准线校准
-st.sidebar.markdown("---")
-st.sidebar.subheader("⚖️ 声音校准")
-if st.session_state['baseline_pitch']:
-    st.sidebar.success(f"已校准基准: {st.session_state['baseline_pitch']} Hz")
-    if st.sidebar.button("清除记忆"):
-        st.session_state['baseline_pitch'] = None
-        st.rerun()
-else:
-    st.sidebar.info("尚未校准。建议录入一声平时最放松的‘喵’作为基准。")
+# --- 2. 顶部设置折叠区 ---
+with st.expander("⚙️ 环境设置与校准 (点此展开)", expanded=False):
+    st.caption("选择当前场景有助于 AI 做出更精准的判断。")
+    context = st.selectbox(
+        "📍 当前场景",
+        ["🍽️ 饭点/厨房", "🚪 门窗/阻隔", "🛋️ 互动/撸猫", "🌙 深夜", "🏥 陌生/就医", "🦋 狩猎模式"]
+    )
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.session_state['baseline_pitch']: st.success(f"基准: {st.session_state['baseline_pitch']}Hz")
+        else: st.info("未校准")
+    with c2:
+        if st.button("清除校准"):
+            st.session_state['baseline_pitch'] = None
+            st.rerun()
 
 # --- 3. 核心功能区 ---
-st.title("🐾 喵星语翻译官 (MeowOS Café)")
+st.title("🐾 MeowOS 全能版")
 
-# 连接 AI 引擎
+# 连接 AI
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
     ai_ready = True
 except:
-    st.error("⚠️ AI 密钥未配置或连接失败，将仅使用本地逻辑模式。")
+    st.warning("⚠️ AI 离线 (仅本地模式)")
     ai_ready = False
 
-col1, col2 = st.columns([1, 1.2])
+# 模式切换
+tab1, tab2 = st.tabs(["🎙️ 录音模式", "📹 录像模式"])
 
-with col1:
-    st.markdown("### 1️⃣ 采集信号")
-    st.info("💡 声音是必填项，照片可辅助 AI 判断。")
-    audio_file = st.file_uploader("录制/上传声音 (WAV/MP3)", type=["wav", "mp3"])
-    img_file = st.camera_input("拍摄猫咪表情 (可选)")
-    if not img_file:
-        img_file = st.file_uploader("或上传照片", type=["jpg", "png", "jpeg"])
-
-with col2:
-    st.markdown("### 2️⃣ 分析面板")
+# ================= Tab 1: 录音 (经典) =================
+with tab1:
+    st.markdown("### 1. 采集信号")
+    # 支持 wav, mp3, m4a 等格式
+    audio_file = st.file_uploader("点击录制或上传音频", type=["wav", "mp3", "m4a", "aac"], key="audio_up")
     
-    if st.button("开始解码 (Translate) 🐾", use_container_width=True):
+    st.markdown("### 2. 视觉辅助 (可选)")
+    # 隐藏式摄像头，点击展开
+    with st.expander("📷 开启摄像头拍照", expanded=False):
+        img_cam = st.camera_input("拍摄猫咪")
+    img_up = st.file_uploader("或上传照片", type=["jpg", "png"], label_visibility="collapsed")
+    img_final = img_cam if img_cam else img_up
+
+    if st.button("开始分析 (音频) 🐾", key="btn_audio"):
         if not audio_file:
-            st.warning("请至少上传一段声音！")
+            st.error("请先上传声音！")
         else:
-            with st.spinner("正在通过声学算法 + AI 视觉进行多模态融合..."):
-                # --- Step A: 本地声学分析 (快思考) ---
-                # 传入基准线进行对比
-                audio_data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
+            with st.spinner("正在解码声波..."):
+                data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
                 
-                # --- Step B: 逻辑判决 (回归 V2 功能) ---
-                # 找回之前被删掉的逻辑树，作为基础保底
-                basic_msg = "无法解析"
-                if "Rising" in audio_data['pitch_trend']:
-                    basic_msg = "🤔 疑问 / 请求 / 撒娇"
-                elif "Falling" in audio_data['pitch_trend']:
-                    basic_msg = "😤 拒绝 / 压力 / 陈述"
-                
-                # 如果有基准线，进行对比
-                if audio_data['pitch_delta'] > 50:
-                    basic_msg += " (音调偏高，情绪激动)"
-                
-                # --- Step C: Gemini AI 深度分析 (慢思考) ---
-                ai_result = ""
-                if ai_ready and img_file:
-                    try:
-                        image = Image.open(img_file)
-                        prompt = f"""
-                        角色：你是一位资深的猫行为学家。
-                        数据输入：
-                        1. 声音分析数据：{audio_data}
-                        2. 环境背景：{context}
-                        3. 视觉图像：(见附图)
-                        
-                        任务：请结合声音数据、环境和照片，用**第一人称**（猫的口吻）翻译这句话。
-                        风格：傲娇、可爱或急切（根据情绪判定）。
-                        
-                        输出格式：
-                        【猫咪心声】：(你的翻译)
-                        【人类建议】：(给主人的行动指南)
-                        """
-                        response = model.generate_content([prompt, image])
-                        ai_result = response.text
-                    except Exception as e:
-                        ai_result = f"AI 连接受阻，仅显示本地分析结果。({e})"
-                elif ai_ready:
-                     # 只有声音没有图，也让 AI 润色文案
-                    prompt = f"环境：{context}。声音特征：{audio_data}。请用猫的口吻翻译这句话，并给出建议。"
-                    response = model.generate_content(prompt)
-                    ai_result = response.text
-
-                # --- 结果展示 UI ---
-                st.markdown("#### 📊 声学指纹")
-                m1, m2, m3 = st.columns(3)
-                m1.metric("旋律趋势", audio_data['pitch_trend'])
-                m2.metric("时长", f"{audio_data['duration']}s")
-                m3.metric("嘶吼/哈气", "是" if audio_data['is_rough'] else "否")
-                
-                # 校准按钮
-                if st.button("🎯 将此声音设为平时基准线"):
-                    st.session_state['baseline_pitch'] = audio_data['mean_pitch']
-                    st.toast("✅ 校准成功！")
-                    time.sleep(1)
-                    st.rerun()
-
-                st.markdown("---")
-                if ai_result:
-                    st.success("✨ 解码成功！")
-                    st.markdown(ai_result)
+                if data['status'] == 'error':
+                    st.error(f"❌ 分析失败: {data['msg']}")
                 else:
-                    st.info(f"本地逻辑推断：{basic_msg}")
-                    if audio_data['is_rough']:
-                        st.error("🚨 警告：检测到粗糙音质（嘶吼），请注意安全！")
+                    # AI 分析
+                    ai_msg = ""
+                    if ai_ready:
+                        try:
+                            prompt = f"环境：{context}。声学数据：{data}。请以猫的第一人称傲娇地翻译心声。"
+                            inputs = [prompt]
+                            if img_final: inputs.append(Image.open(img_final))
+                            ai_msg = model.generate_content(inputs).text
+                        except Exception as e: st.error(f"AI Error: {e}")
+
+                    # 结果展示
+                    st.success("✅ 完成")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("情绪", data['pitch_trend'].split()[0])
+                    c2.metric("时长", f"{data['duration']}s")
+                    c3.metric("音高", f"{data['mean_pitch']}Hz")
+                    
+                    if ai_msg: st.info(ai_msg)
+                    else: st.info(f"本地推断: {data['pitch_trend']}")
+                    
+                    if st.button("🎯 设为基准音高"):
+                        st.session_state['baseline_pitch'] = data['mean_pitch']
+                        st.toast("校准成功！")
+                        time.sleep(1)
+
+# ================= Tab 2: 录像 (新功能) =================
+with tab2:
+    st.info("💡 录像必须包含**清晰的猫叫声**。AI 将结合动作和声音分析。")
+    
+    # 手机点击这个会提示选择“录像”
+    video_file = st.file_uploader("点击录制/上传视频", type=["mp4", "mov", "avi"], key="video_up")
+
+    if st.button("开始分析 (视频) 🎬", key="btn_video"):
+        if not video_file:
+            st.error("请先上传视频！")
+        else:
+            with st.spinner("⏳ 正在分离音轨并进行多模态分析..."):
+                # 创建临时文件处理视频
+                tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+                tfile.write(video_file.read())
+                video_path = tfile.name
+                audio_path = video_path.replace(".mp4", ".wav")
+                
+                # 提取音频
+                has_audio = extract_audio_from_video(video_path, audio_path)
+                
+                if not has_audio:
+                    st.error("❌ 无法从视频中提取声音！")
+                else:
+                    # 声学分析
+                    data = analyze_audio_advanced(audio_path, st.session_state['baseline_pitch'])
+                    
+                    if data['status'] == 'error':
+                        st.warning(f"⚠️ 视频中有声音，但没检测到猫叫: {data['msg']}")
+                        st.caption("AI 将仅基于视觉进行分析...")
+                        data = {"pitch_trend": "未知", "mean_pitch": 0, "is_rough": False} # 兜底数据
+                    
+                    # Gemini 视频分析
+                    ai_msg = ""
+                    if ai_ready:
+                        try:
+                            # 上传视频到 Gemini 缓存
+                            video_blob = genai.upload_file(video_path)
+                            while video_blob.state.name == "PROCESSING":
+                                time.sleep(1)
+                                video_blob = genai.get_file(video_blob.name)
+
+                            prompt = f"""
+                            分析这个猫的视频。
+                            声学辅助数据：{data} (若包含'error'则忽略声学)。
+                            环境：{context}。
+                            请结合猫的动作(尾巴/耳朵)和叫声(如果有)，用第一人称翻译。
+                            """
+                            response = model.generate_content([prompt, video_blob])
+                            ai_msg = response.text
+                        except Exception as e:
+                            st.error(f"AI 分析超时: {e}")
+
+                    st.success("✅ 多模态分析完成")
+                    st.video(video_file)
+                    
+                    if ai_msg:
+                        st.markdown("### 🐱 猫咪心声 (视频版)")
+                        st.info(ai_msg)
+
+                # 清理垃圾
+                try:
+                    os.remove(video_path)
+                    os.remove(audio_path)
+                except: pass
