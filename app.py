@@ -3,7 +3,6 @@ import google.generativeai as genai
 import os
 import time
 import tempfile
-import base64
 from PIL import Image
 from utils import analyze_audio_advanced, extract_audio_from_video
 
@@ -38,10 +37,10 @@ st.markdown("""
         font-weight: 800;
         text-shadow: 2px 2px 0px #FFF;
     }
-    .header-img {
+    .header-container {
         display: flex;
         justify_content: center;
-        margin-bottom: 10px;
+        margin-bottom: 20px;
     }
     .stExpander, .css-1r6slb0, [data-testid="stFileUploadDropzone"] {
         background-color: #FFFFFF !important;
@@ -76,14 +75,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 顶部看板 (Base64 内置动图 - 绝不黑屏) ---
-# 这是一只正在打字的 Bongo Cat 的 Base64 编码，无需网络请求
-BONGO_CAT_B64 = "R0lGODlhZABkAPQAAP///wAAAPj4+Dg4OISEhMwMDAQEBBwcHJycHIyMjFBQUCgoKKioqLi4uDQ0FAQEBHx8fLy8vPz8/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh/h1HaWZCdWlsZGVyIDAuMiBieSBYvesgUGlndXVjACH+QQECgAAACwAAAAAZABkAAAF/iAljmRpnmiqrmzrvnAsz3Rt33iu73zv/8CgcEgsGo/IpHLJbDqf0Kh0Sq1ar9isdsvter/gsHhMLpvP6LR6zW673/C4fE6v2+/4vH7P7/v/gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAwocSLCgwYMIEypcyLChw4cQI0qcSLGixYsYM2rcyLGjx48gQ4ocSbKkyZMo/lOqXMmypcuXMGPKnEmzps2bOHPq3Mmzp8+fQIMKHUq0qNGjSJMqXcq0qdOnUKNKnUq1qtWrWLNq3cq1q9evYMOKHUu2rNmzaNOqXcu2rdu3cOPKnUu3rt27ePPq3cu3r9+/gAMLHky4sOHDiBMrXsy4sePHkCNLnky5suXLmDNr3sy5s+fPoEOLHk26tOnTqFOrXs26tevXsGPLnk27tu3buHPr3s27t+/fwIMLH068uPHjyJMrX868ufPn0KNLn069uvXr2LNr3869u/fv4MOLH0++vPnz6NOrX8++vfv38OPLn0+/vv37+PPr38+/v///AAYo4IAEFmjggQgmqOBCDDbo4IMQRijhhBRWaOGFGGao4YYcdujhhyCGKOKIJJZo4okopqjiiiy26OKLMMYo44w01mjjjTjmqOOOPPbo449ABinkkEQWaeSRSCap5JJMNunkk1BGKeWUVFZp5ZVYZqnlllx26eWXYIYp5phklmnmmWimqeaabLbp5ptwxinnnHTWaeedeOap55589unnn4AGKuighBZq6KGIJqrooow26uijkEYq6aSUVmrppZhmqummnHbq6aeghirqqKSWauqpqKaq6qqsturqq7DGKuustNZq66245qrrrrz26uuvwAYr7LDEFmvsscgmq+yyzDbr7LPQRivttNRWa+212Gar7bbcduvtt+CGK+645JZr7rnopqvuuuy26+678MYr77z01mvvvfjmq+++/Pbr778AByzwwAQXbPDBCCes8MIMN+zwwxBHLPHEFFds8cUYZ6zxxhx37PHHIIcs8sgkl2zyySinrPLKLLfs8sswxyzzzDTXbPPNOOes88489+zzz0AHLfTQRBdt9NFIJ6300kw37fTTUEct9dRU7wcBADs="
+# --- 3. 顶部看板 (高可用 GIF) ---
+# 使用 Giphy 官方源，速度快且稳定
+GIF_URL = "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif"
 
-def render_b64_gif(b64_string, width=150):
-    return f'<div class="header-img"><img src="data:image/gif;base64,{b64_string}" width="{width}"></div>'
+st.markdown(
+    f'<div class="header-container"><img src="{GIF_URL}" width="200" style="border-radius: 15px;"></div>', 
+    unsafe_allow_html=True
+)
 
-st.markdown(render_b64_gif(BONGO_CAT_B64), unsafe_allow_html=True)
 st.title("🐱 喵星电波台")
 st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
 
@@ -138,15 +138,15 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
-# --- 连接云端 (模型突围战) ---
+# --- 连接云端 (指定稳健模型) ---
 ai_ready = False
 try:
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
         genai.configure(api_key=api_key)
         
-        # [核心修改] 使用 Experimental 模型，通常有独立配额
-        model_target = 'gemini-exp-1206' 
+        # [核心修改] 使用你的 Debug 列表中明确存在的模型
+        model_name = 'gemini-flash-latest' 
         
         system_instruction = """
         你是一只猫。你只能用猫的视角和口吻说话。
@@ -157,7 +157,7 @@ try:
         """
         
         model = genai.GenerativeModel(
-            model_name=model_target,
+            model_name=model_name,
             system_instruction=system_instruction
         )
         ai_ready = True
@@ -188,7 +188,7 @@ with tab1:
             loading_placeholder = st.empty() 
             
             with loading_placeholder.container():
-                st.markdown(render_b64_gif(BONGO_CAT_B64, width=150), unsafe_allow_html=True)
+                st.markdown(f'<div class="header-container"><img src="{GIF_URL}" width="150" style="border-radius:15px"></div>', unsafe_allow_html=True)
                 st.info("🎧 正在捕获声波特征...")
                 st.progress(10)
             
@@ -196,7 +196,7 @@ with tab1:
             data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
             
             with loading_placeholder.container():
-                st.markdown(render_b64_gif(BONGO_CAT_B64, width=150), unsafe_allow_html=True)
+                st.markdown(f'<div class="header-container"><img src="{GIF_URL}" width="150" style="border-radius:15px"></div>', unsafe_allow_html=True)
                 st.info("📡 正在连接喵星基站 (50Hz)...")
                 st.progress(50)
 
@@ -215,7 +215,7 @@ with tab1:
                 ai_result = ""
                 if ai_ready:
                     with loading_placeholder.container():
-                        st.markdown(render_b64_gif(BONGO_CAT_B64, width=150), unsafe_allow_html=True)
+                        st.markdown(f'<div class="header-container"><img src="{GIF_URL}" width="150" style="border-radius:15px"></div>', unsafe_allow_html=True)
                         st.info("🐈 正在破译加密电波...")
                         st.progress(80)
                     
@@ -270,7 +270,7 @@ with tab2:
             loading_placeholder = st.empty()
             
             with loading_placeholder.container():
-                st.markdown(render_b64_gif(BONGO_CAT_B64, width=150), unsafe_allow_html=True)
+                st.markdown(f'<div class="header-container"><img src="{GIF_URL}" width="150" style="border-radius:15px"></div>', unsafe_allow_html=True)
                 st.info("🎞️ 正在分离音轨 & 逐帧解析...")
                 st.progress(30)
 
@@ -294,7 +294,7 @@ with tab2:
                 ai_msg = ""
                 if ai_ready:
                     with loading_placeholder.container():
-                        st.markdown(render_b64_gif(BONGO_CAT_B64, width=150), unsafe_allow_html=True)
+                        st.markdown(f'<div class="header-container"><img src="{GIF_URL}" width="150" style="border-radius:15px"></div>', unsafe_allow_html=True)
                         st.info("🐈 AI 大脑正在疯狂运转...")
                         st.progress(70)
 
