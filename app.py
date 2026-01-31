@@ -123,7 +123,7 @@ with st.expander("🔬 喵星发声学原理 (Science)", expanded=False):
         * 短促音 (<0.5s): 社交问候 / 确认存在。
         * 长音 (>1.0s): 强烈需求 (我要吃!) / 抱怨 (放我出去!)。
     * **🌊 粗糙度 (Roughness)**: 声音嘶哑或带杂音，通常对应**防御**、**痛苦**或**极度亢奋**。
-    * **接入 Google Gemini 大模型，识别毫秒级的微表情（飞机耳/瞳孔放大）
+    * 接入 **Gemini** 大模型，识别毫秒级的微表情（飞机耳/瞳孔放大）
     """)
 
 # 信号控制台
@@ -334,4 +334,5 @@ with tab2:
                 os.remove(video_path)
                 os.remove(audio_path)
             except: pass
+
 
