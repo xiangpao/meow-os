@@ -22,7 +22,6 @@ if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
 if 'baseline_pitch' not in st.session_state:
     st.session_state['baseline_pitch'] = None
 
-# 用于存储最近一次的分析结果，方便在设置里调用
 if 'latest_analysis' not in st.session_state:
     st.session_state['latest_analysis'] = None
 
@@ -120,34 +119,58 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
         "📍 信号发射源 (当前场景)",
         ["🍽️ 干饭时刻 (Food)", "🚪 门窗/受阻 (Barrier)", "🛋️ 贴贴/求摸 (Affection)", "🏥 害怕/应激 (Stress)", "🦋 猎杀时刻 (Hunting)", "😡 别挨老子 (Warning)", "🌙 深夜跑酷 (Night)"]
     )
+    
     st.markdown("---")
-    
-    # 2. 校准控制台
     st.markdown("**🎛️ 声纹校准控制台**")
+
+    # 2. [新增] 独立校准上传区
+    # 这里允许用户直接上传文件进行校准，不需要去下面跑流程
+    calib_file = st.file_uploader(
+        "🎙️ 上传一段“平时最放松的喵叫” (仅校准)", 
+        type=["wav", "mp3", "m4a", "aac"], 
+        key="cal_up",
+        label_visibility="visible"
+    )
     
-    # 显示当前状态
-    col_status, col_action = st.columns([2, 1])
+    if calib_file:
+        if st.button("⚡ 立即分析并设为基准", key="btn_cal_direct"):
+            with st.spinner("正在提取声纹特征..."):
+                # 调用核心算法，不传入基准，只提取数据
+                cal_data = analyze_audio_advanced(calib_file, baseline_pitch=None)
+                
+                if cal_data['status'] == 'error':
+                    st.error(f"❌ 校准失败: {cal_data['msg']}")
+                else:
+                    new_pitch = cal_data['mean_pitch']
+                    st.session_state['baseline_pitch'] = new_pitch
+                    st.success(f"✅ 校准成功！已锁定基准频率: {new_pitch}Hz")
+                    time.sleep(1)
+                    st.rerun()
+
+    st.markdown("---")
+
+    # 3. 状态显示与清除区 (双栏布局)
+    col_status, col_clear = st.columns([2, 1])
+    
     with col_status:
+        # 左侧：显示当前状态
         if st.session_state['baseline_pitch']: 
             st.success(f"✅ 当前基准: {st.session_state['baseline_pitch']}Hz")
         else: 
-            # [修改点] 文案补充
-            st.info("💡 建议录入一声「平时最放松的叫声」作为校准")
+            st.info("💡 尚未录入基准")
             
-    with col_action:
+    with col_clear:
+        # 右侧：清除按钮
         if st.button("🗑️ 清除缓存"):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
-    # 3. 动态更新按钮 (只有当有分析结果时才显示)
+    # 4. 保留“从翻译结果校准”的快捷方式 (不冲突，多一种选择)
     if st.session_state.get('latest_analysis') and st.session_state['latest_analysis']['type'] == 'audio':
         last_pitch = st.session_state['latest_analysis']['data']['mean_pitch']
-        st.caption(f"检测到最近一次分析音高为: **{last_pitch}Hz**")
-        
-        # [修改点] 校准按钮移到了这里
-        if st.button("🎯 将最近一次结果设为基准"):
+        if st.button(f"🎯 将刚才的翻译结果 ({last_pitch}Hz) 设为基准"):
             st.session_state['baseline_pitch'] = last_pitch
-            st.toast(f"校准成功！基准已更新为 {last_pitch}Hz")
+            st.toast(f"基准已更新为 {last_pitch}Hz")
             time.sleep(1)
             st.rerun()
 
@@ -182,7 +205,6 @@ with tab1:
     img_up = st.file_uploader("或从相册上传图片", type=["jpg", "png"], key="img_up", label_visibility="collapsed")
     img_final = img_cam if img_cam else img_up
 
-    # 按钮点击时，执行分析
     if st.button("📡 开始解码信号", key="btn_audio"):
         if not audio_file:
             st.error("请先上传一段喵叫声！")
@@ -217,7 +239,6 @@ with tab1:
                             ai_result = model.generate_content(inputs).text
                         except Exception as e: st.error(f"云端连接中断: {e}")
                     
-                    # 将结果存入 Session State，防止刷新消失
                     st.session_state['latest_analysis'] = {
                         "data": data,
                         "ai_result": ai_result,
@@ -225,7 +246,6 @@ with tab1:
                         "type": "audio"
                     }
 
-    # --- 结果展示区 ---
     if st.session_state['latest_analysis'] and st.session_state['latest_analysis']['type'] == 'audio':
         res = st.session_state['latest_analysis']
         data = res['data']
@@ -242,8 +262,6 @@ with tab1:
             st.info(f"“ {res['ai_result']} ”")
         else:
             st.info(f"（AI 离线）本地推断：大概是【{res['logic_str']}】的意思。")
-
-        # [修改点] 底部的校准按钮已移除，现在通过设置面板操作，界面更干净
 
 # === Tab 2: 视频 ===
 with tab2:
@@ -288,7 +306,6 @@ with tab2:
                             ai_msg = response.text
                         except Exception as e: st.error(f"AI 罢工了: {e}")
 
-                    # 存入 session
                     st.session_state['latest_analysis'] = {
                         "data": data,
                         "ai_result": ai_msg,
@@ -301,7 +318,6 @@ with tab2:
                     os.remove(audio_path)
                 except: pass
 
-    # --- 视频结果展示区 ---
     if st.session_state['latest_analysis'] and st.session_state['latest_analysis']['type'] == 'video':
         res = st.session_state['latest_analysis']
         st.success("✅ 多模态分析结束")
