@@ -94,38 +94,32 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. 资源定义 ---
-# (1) 顶部 Logo：读取本地 logo.gif
+# (1) 顶部 Logo
 def render_local_logo(width=200):
     if os.path.exists("logo.gif"):
         with open("logo.gif", "rb") as f:
             b64 = base64.b64encode(f.read()).decode()
         return f'<div class="header-img"><img src="data:image/gif;base64,{b64}" width="{width}" style="border-radius:15px"></div>'
     else:
-        # 兜底网络图
         return f'<div class="header-img"><img src="https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif" width="{width}"></div>'
 
-# (2) 等待动画：打字猫链接
+# (2) 等待动画
 LOADING_GIF = "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif"
-
 def render_loading_gif(width=150):
     return f'<div class="header-img"><img src="{LOADING_GIF}" width="{width}" style="border-radius:15px"></div>'
 
 # --- 4. 界面渲染 ---
-# 顶部看板 (常驻)
 st.markdown(render_local_logo(), unsafe_allow_html=True)
 st.title("🐱 喵星电波台")
-st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密喵言喵语 ——</i></p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
 
-# 科学原理
+# 科学原理 (找回“波形图”的依据)
 with st.expander("🔬 喵星发声学原理 (Science)", expanded=False):
     st.markdown("""
     **本台解码算法基于瑞典隆德大学 Susanne Schötz 教授的猫语旋律学研究：**
-    * **🎵 升调 (Rising Pitch ↗)**: 类似人类的疑问句，通常代表**请求 (Soliciting)** 或 **友好的确认**。
-    * **🎵 降调 (Falling Pitch ↘)**: 类似人类的陈述句，通常代表**拒绝**、**压力**或**自信的陈述**。
-    * **⏳ 时长 (Duration)**: 
-        * 短促音 (<0.5s): 社交问候 / 确认存在。
-        * 长音 (>1.0s): 强烈需求 (我要吃!) / 抱怨 (放我出去!)。
-    * **🌊 粗糙度 (Roughness)**: 声音嘶哑或带杂音，通常对应**防御**、**痛苦**或**极度亢奋**。
+    * **🎵 声纹分析**: Librosa 引擎将每一声“喵”绘制成波形图。
+    * **📈 升调/降调**: 升调↗=请求; 降调↘=拒绝。
+    * **🧠 贝叶斯推断**: 结合场景上下文计算意图概率。
     """)
 
 # 信号控制台
@@ -195,30 +189,27 @@ with tab1:
         elif not audio_file:
             st.error("⚠️ 请先上传喵叫声！")
         else:
-            # === 剧情模式加载 ===
+            # === 剧情加载 ===
             loading = st.empty()
             
-            # 0% 阶段
             with loading.container():
                 st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                 st.info("📡 正在连接喵星基站...")
                 st.progress(0)
-            time.sleep(0.5) # 增加微小延迟让用户看清文案
+            time.sleep(0.5)
 
-            # 30% 阶段
             with loading.container():
                 st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                 st.info("📶 发现加密频率，正在握手...")
                 st.progress(30)
             
-            # 执行本地分析
+            # 本地分析 (含绘图)
             data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
             
             if data['status'] == 'error':
                 loading.empty()
                 st.error(f"❌ 失败: {data['msg']}")
             else:
-                # 60% 阶段
                 with loading.container():
                     st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                     st.info("🧠 AI 大脑正在疯狂运转...")
@@ -234,16 +225,22 @@ with tab1:
                     except: 
                         st.warning("云端信号弱，转为离线分析。")
 
-                # 90% 阶段
                 with loading.container():
                     st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                     st.info("📩 翻译完成，准备发送！")
                     st.progress(90)
-                time.sleep(0.5) # 增加微小延迟营造“发送”感
+                time.sleep(0.5)
 
                 loading.empty() # 清除等待动画
 
+                # 结果展示
                 st.success("✅ 电波接收成功")
+                
+                # [新增] 显示波形图
+                if data.get('waveform_fig'):
+                    st.caption("📉 声纹可视化 (Librosa Waveform)")
+                    st.pyplot(data['waveform_fig'])
+
                 c1, c2, c3 = st.columns(3)
                 c1.metric("情绪", data['pitch_trend'].split()[0])
                 c2.metric("时长", f"{data['duration']}s")
@@ -267,14 +264,12 @@ with tab2:
         else:
             loading = st.empty()
             
-            # 0% 阶段
             with loading.container():
                 st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                 st.info("📡 正在连接喵星基站...")
                 st.progress(0)
             time.sleep(0.5)
 
-            # 30% 阶段
             with loading.container():
                 st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                 st.info("📶 发现加密频率，正在握手...")
@@ -291,7 +286,6 @@ with tab2:
                 loading.empty()
                 st.error("❌ 视频无声音")
             else:
-                # 60% 阶段
                 with loading.container():
                     st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                     st.info("🧠 AI 大脑正在疯狂运转...")
@@ -311,7 +305,6 @@ with tab2:
                         ai_msg = response.text
                     except: pass
                 
-                # 90% 阶段
                 with loading.container():
                     st.markdown(render_loading_gif(width=150), unsafe_allow_html=True)
                     st.info("📩 翻译完成，准备发送！")
@@ -320,6 +313,12 @@ with tab2:
 
                 loading.empty()
                 st.success("✅ 完成")
+                
+                # [新增] 视频模式也显示波形图
+                if data.get('waveform_fig'):
+                    st.caption("📉 声纹可视化")
+                    st.pyplot(data['waveform_fig'])
+
                 st.video(video_file)
                 st.markdown("### 🐱 主子说：")
                 if ai_msg:
@@ -331,6 +330,3 @@ with tab2:
                 os.remove(video_path)
                 os.remove(audio_path)
             except: pass
-
-
-
