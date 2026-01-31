@@ -67,6 +67,7 @@ st.markdown("""
         box-shadow: 0 6px 15px rgba(139, 69, 19, 0.5);
         background: linear-gradient(45deg, #E67E22, #A0522D);
     }
+    /* Tab 样式 */
     .stTabs [data-baseweb="tab"] {
         background-color: #F5E6D3;
         border-radius: 15px 15px 0 0;
@@ -89,16 +90,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. 顶部看板 ---
-def render_gif(gif_path, width=200):
+def render_gif_html(gif_path, width=200):
+    """生成 GIF 的 HTML 代码，不直接显示，返回字符串"""
     try:
         with open(gif_path, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
-        st.markdown(f'<div style="text-align: center;"><img src="data:image/gif;base64,{b64}" width="{width}"></div>', unsafe_allow_html=True)
+        return f'<div style="text-align: center;"><img src="data:image/gif;base64,{b64}" width="{width}"></div>'
     except:
-        st.markdown(f'<div style="text-align: center;"><img src="https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif" width="{width}"></div>', unsafe_allow_html=True)
+        return f'<div style="text-align: center;"><img src="https://media.tenor.com/4JPf4v6sHjIAAAAj/bongo-cat-typing.gif" width="{width}"></div>'
 
-render_gif("logo.gif")
+# 初始显示静态 Logo
+st.markdown(render_gif_html("logo.gif"), unsafe_allow_html=True)
 
 st.title("🐱 喵星电波台")
 st.markdown("<p style='text-align: center; margin-top: -15px; color: #8D6E63;'><i>—— 接收来自 50Hz 频段的加密心声 ——</i></p>", unsafe_allow_html=True)
@@ -132,6 +135,7 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
     
     if calib_file:
         if st.button("⚡ 立即分析并设为基准", key="btn_cal_direct"):
+            # 这里的 Spinner 也可以保留，因为很快
             with st.spinner("正在提取声纹特征..."):
                 cal_data = analyze_audio_advanced(calib_file, baseline_pitch=None)
                 if cal_data['status'] == 'error':
@@ -156,43 +160,32 @@ with st.expander("⚙️ 调频与校准 (Settings)", expanded=False):
             st.session_state['baseline_pitch'] = None
             st.rerun()
 
-    if st.session_state.get('latest_analysis') and st.session_state['latest_analysis']['type'] == 'audio':
-        last_pitch = st.session_state['latest_analysis']['data']['mean_pitch']
-        if st.button(f"🎯 将刚才的翻译结果 ({last_pitch}Hz) 设为基准"):
-            st.session_state['baseline_pitch'] = last_pitch
-            st.toast(f"基准已更新为 {last_pitch}Hz")
-            time.sleep(1)
-            st.rerun()
-
 # --- 连接云端 ---
-ai_status_msg = ""
 ai_ready = False
+# 配置 System Instruction (系统指令)，强制锁定角色
+# 注意：这需要 google-generativeai >= 0.7.2
 try:
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
         genai.configure(api_key=api_key)
         
-        # [修改点] 系统指令：强制锁定猫的身份
-        generation_config = {
-            "temperature": 0.7,
-            "max_output_tokens": 100,
-        }
-        system_instruction = "你是一只猫。你只能用猫的视角和口吻说话。禁止使用任何第三人称描述（如'这只猫'、'它'）。禁止解释你的回答。直接输出你的心声。语气要符合猫的性格（傲娇、慵懒、或急切）。"
+        system_instruction = """
+        你是一只猫。你只能用猫的视角和口吻说话。
+        禁止使用任何第三人称描述（如'这只猫'、'它'、'主子'）。
+        禁止解释你的回答。
+        直接输出你的心声。
+        语气要生动、二次元，根据数据判断是傲娇、慵懒、还是急切。
+        """
         
-        # 尝试实例化模型
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
-            system_instruction=system_instruction, # 注入系统指令
-            generation_config=generation_config
+            model_name='gemini-1.5-flash', # 坚守 1.5 Flash 稳健版
+            system_instruction=system_instruction
         )
         ai_ready = True
     else:
-        ai_status_msg = "密钥缺失"
+        st.caption("⚠️ 密钥缺失")
 except Exception as e:
-    ai_status_msg = str(e)
-
-if not ai_ready:
-    st.warning(f"⚠️ 仅本地模式 (AI 离线)")
+    st.caption(f"⚠️ 初始化异常: {e}")
 
 # --- 核心功能 ---
 tab1, tab2 = st.tabs(["🎙️ 语音接收", "📹 视频同传"])
@@ -212,46 +205,71 @@ with tab1:
         if not audio_file:
             st.error("请先上传一段喵叫声！")
         else:
-            with st.spinner("🐈 正在破译加密电波..."):
-                data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
+            # === 核心修改：C+D 混合等待特效 ===
+            loading_placeholder = st.empty() # 创建占位容器
+            
+            # 第一阶段：显示 GIF 和初始进度
+            with loading_placeholder.container():
+                st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                st.info("🎧 正在捕获声波特征...")
+                st.progress(10)
+            
+            # 执行本地声学分析
+            data = analyze_audio_advanced(audio_file, st.session_state['baseline_pitch'])
+            
+            # 第二阶段：更新进度
+            with loading_placeholder.container():
+                st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                st.info("📡 正在连接喵星基站 (50Hz)...")
+                st.progress(50)
+
+            if data['status'] == 'error':
+                loading_placeholder.empty() # 清除等待动图
+                st.error(f"❌ 信号干扰: {data['msg']}")
+            else:
+                # 准备逻辑字符串
+                local_logic = []
+                if data['duration'] < 0.6: local_logic.append("短促音(打招呼)")
+                elif data['duration'] > 1.2: local_logic.append("长音(需求/抱怨)")
+                if "Rising" in data['pitch_trend']: local_logic.append("升调(疑问/请求)")
+                elif "Falling" in data['pitch_trend']: local_logic.append("降调(拒绝/陈述)")
+                logic_str = " + ".join(local_logic)
+
+                # AI 分析
+                ai_result = ""
+                if ai_ready:
+                    # 第三阶段：AI 思考中
+                    with loading_placeholder.container():
+                        st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                        st.info("🐈 正在破译加密电波...")
+                        st.progress(80)
+                    
+                    try:
+                        prompt = f"""
+                        当前环境：{context}
+                        声音特征：{data['pitch_trend']}，时长{data['duration']}秒。
+                        请翻译我（猫）这一刻在说什么。
+                        """
+                        inputs = [prompt]
+                        if img_final: inputs.append(Image.open(img_final))
+                        ai_result = model.generate_content(inputs).text
+                    except Exception as e: 
+                        st.error(f"云端连接中断: {e}")
+                        if "404" in str(e):
+                            st.caption("请尝试在 Streamlit 后台 Reboot 或 Delete App 重建。")
                 
-                if data['status'] == 'error':
-                    st.error(f"❌ 信号干扰: {data['msg']}")
-                else:
-                    # 本地逻辑
-                    local_logic = []
-                    if data['duration'] < 0.6: local_logic.append("短促音(打招呼)")
-                    elif data['duration'] > 1.2: local_logic.append("长音(需求/抱怨)")
-                    if "Rising" in data['pitch_trend']: local_logic.append("升调(疑问/请求)")
-                    elif "Falling" in data['pitch_trend']: local_logic.append("降调(拒绝/陈述)")
-                    logic_str = " + ".join(local_logic)
+                # 任务完成，清除占位符
+                loading_placeholder.empty()
 
-                    # AI 分析
-                    ai_result = ""
-                    if ai_ready:
-                        try:
-                            # [修改点] Prompt 简化，因为已经有 System Instruction 坐镇了
-                            prompt = f"""
-                            当前环境：{context}
-                            声音特征：{data['pitch_trend']}，时长{data['duration']}秒。
-                            请根据以上信息，翻译我（猫）这一刻在说什么。
-                            """
-                            inputs = [prompt]
-                            if img_final: inputs.append(Image.open(img_final))
-                            ai_result = model.generate_content(inputs).text
-                        except Exception as e: 
-                            # 如果 1.5-flash 依然报错，尝试 fallback 到旧模型（虽然不推荐，但为了容错）
-                            st.error(f"云端连接中断: {e}")
-                            if "404" in str(e):
-                                st.caption("提示：请检查 requirements.txt 是否已更新为 google-generativeai>=0.7.2")
+                # 存入 Session
+                st.session_state['latest_analysis'] = {
+                    "data": data,
+                    "ai_result": ai_result,
+                    "logic_str": logic_str,
+                    "type": "audio"
+                }
 
-                    st.session_state['latest_analysis'] = {
-                        "data": data,
-                        "ai_result": ai_result,
-                        "logic_str": logic_str,
-                        "type": "audio"
-                    }
-
+    # 结果展示
     if st.session_state['latest_analysis'] and st.session_state['latest_analysis']['type'] == 'audio':
         res = st.session_state['latest_analysis']
         data = res['data']
@@ -267,7 +285,9 @@ with tab1:
         if res['ai_result']:
             st.info(f"“ {res['ai_result']} ”")
         else:
-            st.info(f"（AI 离线）本地推断：大概是【{res['logic_str']}】的意思。")
+            # 本地兜底文案优化
+            st.warning(f"（AI 离线 - 启动备用翻译协议）")
+            st.info(f"🤖 系统推断：根据声学特征，这句喵大概是【{res['logic_str']}】的意思。")
 
 # === Tab 2: 视频 ===
 with tab2:
@@ -278,52 +298,67 @@ with tab2:
         if not video_file:
             st.warning("请先上传视频喵！")
         else:
-            with st.spinner("🐈 正在同步视觉与听觉信号..."):
-                tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-                tfile.write(video_file.read())
-                video_path = tfile.name
-                audio_path = video_path.replace(".mp4", ".wav")
-                
-                has_audio = extract_audio_from_video(video_path, audio_path)
-                
-                if not has_audio:
-                    st.error("❌ 视频里没有声音呀！")
-                else:
-                    data = analyze_audio_advanced(audio_path, st.session_state['baseline_pitch'])
-                    
-                    if data['status'] == 'error':
-                        st.warning("⚠️ 未检测到猫叫声，将仅分析动作。")
-                        data = {"pitch_trend": "未知", "duration": 0, "mean_pitch": 0} 
-                    
-                    ai_msg = ""
-                    if ai_ready:
-                        try:
-                            video_blob = genai.upload_file(video_path)
-                            while video_blob.state.name == "PROCESSING":
-                                time.sleep(1)
-                                video_blob = genai.get_file(video_blob.name)
+            # === C+D 混合等待特效 (视频版) ===
+            loading_placeholder = st.empty()
+            
+            with loading_placeholder.container():
+                st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                st.info("🎞️ 正在分离音轨 & 逐帧解析...")
+                st.progress(30)
 
-                            # [修改点] Prompt 简化
-                            prompt = f"""
-                            观察我的动作（尾巴/耳朵）和听我的声音（{data}）。
-                            环境：{context}。
-                            告诉我（猫）现在在抱怨什么或要什么。
-                            """
-                            response = model.generate_content([prompt, video_blob])
-                            ai_msg = response.text
-                        except Exception as e: st.error(f"AI 罢工了: {e}")
-
-                    st.session_state['latest_analysis'] = {
-                        "data": data,
-                        "ai_result": ai_msg,
-                        "video_path": video_file,
-                        "type": "video"
-                    }
+            tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            tfile.write(video_file.read())
+            video_path = tfile.name
+            audio_path = video_path.replace(".mp4", ".wav")
+            
+            has_audio = extract_audio_from_video(video_path, audio_path)
+            
+            if not has_audio:
+                loading_placeholder.empty()
+                st.error("❌ 视频里没有声音呀！")
+            else:
+                data = analyze_audio_advanced(audio_path, st.session_state['baseline_pitch'])
                 
-                try:
-                    os.remove(video_path)
-                    os.remove(audio_path)
-                except: pass
+                if data['status'] == 'error':
+                    st.warning("⚠️ 未检测到猫叫声，将仅分析动作。")
+                    data = {"pitch_trend": "未知", "duration": 0, "mean_pitch": 0} 
+                
+                ai_msg = ""
+                if ai_ready:
+                    with loading_placeholder.container():
+                        st.markdown(render_gif_html("logo.gif", width=150), unsafe_allow_html=True)
+                        st.info("🐈 AI 大脑正在疯狂运转...")
+                        st.progress(70)
+
+                    try:
+                        video_blob = genai.upload_file(video_path)
+                        while video_blob.state.name == "PROCESSING":
+                            time.sleep(1)
+                            video_blob = genai.get_file(video_blob.name)
+
+                        prompt = f"""
+                        环境：{context}。
+                        声音数据：{data}。
+                        告诉我（猫）现在在抱怨什么或要什么。
+                        """
+                        response = model.generate_content([prompt, video_blob])
+                        ai_msg = response.text
+                    except Exception as e: 
+                        st.error(f"AI 罢工了: {e}")
+
+                loading_placeholder.empty()
+
+                st.session_state['latest_analysis'] = {
+                    "data": data,
+                    "ai_result": ai_msg,
+                    "video_path": video_file,
+                    "type": "video"
+                }
+            
+            try:
+                os.remove(video_path)
+                os.remove(audio_path)
+            except: pass
 
     if st.session_state['latest_analysis'] and st.session_state['latest_analysis']['type'] == 'video':
         res = st.session_state['latest_analysis']
