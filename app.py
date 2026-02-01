@@ -185,7 +185,12 @@ with tab1:
     audio_file = st.file_uploader("上传音频", type=["wav", "mp3", "m4a", "aac"], key="audio_up", label_visibility="collapsed")
     
     with st.expander("📷 (可选) 增加照片辅助", expanded=False):
-        img_cam = st.camera_input("拍照")
+       # [修改点] 增加开关，防止自动请求摄像头权限
+        enable_cam = st.checkbox("📸 点击启动相机")
+        img_cam = None
+        if enable_cam:
+            img_cam = st.camera_input("拍照")
+            
         img_up = st.file_uploader("或上传图片", type=["jpg", "png"], key="img_up")
     img_final = img_cam if img_cam else img_up
 
@@ -336,6 +341,7 @@ with tab2:
                 os.remove(video_path)
                 os.remove(audio_path)
             except: pass
+
 
 
 
