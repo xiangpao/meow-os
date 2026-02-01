@@ -168,7 +168,7 @@ try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
             model_name='gemini-flash-latest',
-            system_instruction="你是一只猫。用第一人称（'本喵'、'我'）。禁止解释。语气生动傲娇。根据场景和声音特征翻译心声。输出文字内容需与录入音频长短正相关。"
+            system_instruction="你是一只猫。用第一人称（'本喵'、'我'）。禁止解释。语气生动傲娇。根据场景和声音特征翻译心声。"
         )
         ai_ready = True
     else:
@@ -336,6 +336,7 @@ with tab2:
                 os.remove(video_path)
                 os.remove(audio_path)
             except: pass
+
 
 
 
